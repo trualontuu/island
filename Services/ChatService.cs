@@ -3,133 +3,152 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Anthropic;
-using Anthropic.Exceptions;
-using Anthropic.Models.Beta.Messages;
 using Island.Core;
 
 namespace Island.Services;
 
 /// <summary>
-/// Чат с Claude: стриминг, история в памяти, блоки размышлений возвращаются в историю без изменений
-/// (иначе API отклонит продолжение диалога). Отказы модели перехватывает серверный fallback.
+/// Чат с нейросетью через любой OpenAI-совместимый API (OpenRouter — бесплатные модели, DeepSeek, свой сервер):
+/// ответ приходит потоком (SSE), история диалога — в памяти до «Новый чат».
 /// </summary>
 public sealed class ChatService
 {
     readonly Settings _settings;
-    readonly List<BetaMessageParam> _history = new();
-    AnthropicClient? _client;
-    string _clientKey = "";
     CancellationTokenSource? _cts;
 
     public bool Busy { get; private set; }
 
     public ChatService(Settings s) => _settings = s;
 
-    public void Reset() { Cancel(); _history.Clear(); }
+    public void Reset() { Cancel(); _oaHistory.Clear(); }
     public void Cancel() => _cts?.Cancel();
+
+    // ================= OpenAI-совместимые: OpenRouter, DeepSeek, свой сервер =================
+    readonly List<(string Role, string Text)> _oaHistory = new();
+    static readonly System.Net.Http.HttpClient Http = new() { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
 
     /// <param name="onText">кусочки ответа по мере генерации (вызывается из фонового потока)</param>
     public async Task<string> SendAsync(string userText, Action<string> onText)
     {
-        var key = _settings.EffectiveApiKey;
-        if (string.IsNullOrEmpty(key))
-            throw new InvalidOperationException("Нет API-ключа: укажи его в настройках острова или в переменной ANTHROPIC_API_KEY.");
-        if (_client == null || _clientKey != key) { _client = new AnthropicClient { ApiKey = key }; _clientKey = key; }
+        var prov = _settings.ChatProvider;
+        var cfg = _settings.AiFor(prov);
+        if (string.IsNullOrWhiteSpace(cfg.Key))
+            throw new InvalidOperationException(prov == "openrouter"
+                ? "Нет ключа OpenRouter. Бесплатный ключ: openrouter.ai/keys → вставь его в настройках острова."
+                : "Нет API-ключа — укажи его в настройках острова.");
+        if (string.IsNullOrWhiteSpace(cfg.Model)) throw new InvalidOperationException("Не указана модель — впиши её в настройках острова.");
 
-        _history.Add(new BetaUserMessageParam { Content = userText });
+        _oaHistory.Add(("user", userText));
         _cts = new CancellationTokenSource();
         Busy = true;
-
         var text = new StringBuilder();
-        var blocks = new List<BetaContentBlockParam>();
-        StringBuilder? thinking = null; string signature = "";
-        bool inText = false;
-        string? stop = null;
-
         try
         {
-            var p = new MessageCreateParams
+            // OpenRouter: если модель убрали из бесплатных или она упёрлась в лимит — повторяем через
+            // «openrouter/free» (сам выбирает доступную бесплатную модель). Ошибка у пользователя — только если не вышло и так.
+            string model = cfg.Model.Trim();
+            System.Net.Http.HttpResponseMessage resp;
+            while (true)
             {
-                Model = _settings.Model,
-                MaxTokens = 64000,
-                System = _settings.SystemPrompt,
-                OutputConfig = new BetaOutputConfig { Effort = ParseEffort(_settings.Effort) },
-                Betas = ["server-side-fallback-2026-07-01"],
-                Fallbacks = new Default(),
-                Messages = new List<BetaMessageParam>(_history),
-            };
-
-            await foreach (var ev in _client.Beta.Messages.CreateStreaming(p, _cts.Token))
+                resp = await Http.SendAsync(BuildRequest(cfg, model, prov), System.Net.Http.HttpCompletionOption.ResponseHeadersRead, _cts.Token);
+                if (resp.IsSuccessStatusCode) break;
+                int code = (int)resp.StatusCode;
+                var err = await resp.Content.ReadAsStringAsync(_cts.Token);
+                resp.Dispose();
+                if (prov == "openrouter" && model != FreeRouter && code is 404 or 429 or 400 or 503) { model = FreeRouter; continue; }
+                throw new InvalidOperationException(FriendlyError(code, err));
+            }
+            using var _resp = resp;
+            using var stream = await resp.Content.ReadAsStreamAsync(_cts.Token);
+            using var reader = new System.IO.StreamReader(stream, Encoding.UTF8);
+            string? line;
+            while ((line = await reader.ReadLineAsync(_cts.Token)) != null)
             {
-                if (ev.TryPickContentBlockStart(out var start))
+                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue; // пустые строки и служебные «: ...»
+                var data = line.Substring(5).Trim();
+                if (data == "[DONE]") break;
+                if (data.Length == 0) continue;
+                using var doc = System.Text.Json.JsonDocument.Parse(data);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("error", out var e))
+                    throw new InvalidOperationException("Ошибка модели: " + (e.ValueKind == System.Text.Json.JsonValueKind.Object && e.TryGetProperty("message", out var m) ? m.GetString() : e.ToString()));
+                if (!root.TryGetProperty("choices", out var ch) || ch.GetArrayLength() == 0) continue;
+                if (ch[0].TryGetProperty("delta", out var d) && d.TryGetProperty("content", out var c) && c.ValueKind == System.Text.Json.JsonValueKind.String)
                 {
-                    FlushText();
-                    var cb = start.ContentBlock.Value;
-                    if (cb is BetaThinkingBlock) { thinking = new StringBuilder(); signature = ""; }
-                    else if (cb is BetaTextBlock) inText = true;
-                }
-                else if (ev.TryPickContentBlockDelta(out var d))
-                {
-                    if (d.Delta.TryPickText(out var t)) { text.Append(t.Text); onText(t.Text); }
-                    else if (d.Delta.TryPickThinking(out var th)) thinking?.Append(th.Thinking);
-                    else if (d.Delta.TryPickSignature(out var sig)) signature += sig.Signature;
-                }
-                else if (ev.TryPickContentBlockStop(out _))
-                {
-                    if (thinking != null) { blocks.Add(new BetaThinkingBlockParam { Thinking = thinking.ToString(), Signature = signature }); thinking = null; }
-                    FlushText();
-                }
-                else if (ev.TryPickDelta(out var md) && md.Delta.StopReason is { } sr)
-                {
-                    stop = sr.ToString();
+                    var piece = c.GetString();
+                    if (!string.IsNullOrEmpty(piece)) { text.Append(piece); onText(piece); }
                 }
             }
-            FlushText();
-
-            if (stop != null && stop.Contains("refusal", StringComparison.OrdinalIgnoreCase) && text.Length == 0)
-            {
-                _history.RemoveAt(_history.Count - 1);
-                return "Модель отказалась отвечать на этот запрос.";
-            }
-            if (blocks.Count == 0) blocks.Add(new BetaTextBlockParam { Text = " " });
-            _history.Add(new BetaAssistantMessageParam { Content = blocks });
-            return text.ToString();
+            var answer = text.ToString().Trim();
+            if (answer.Length == 0) answer = "(пустой ответ — попробуй ещё раз или выбери другую модель)";
+            _oaHistory.Add(("assistant", answer));
+            return answer;
         }
         catch (OperationCanceledException)
         {
-            _history.RemoveAt(_history.Count - 1);
-            return text.Length > 0 ? text + " …(остановлено)" : "(остановлено)";
+            if (text.Length > 0) { _oaHistory.Add(("assistant", text.ToString())); return text + " …(остановлено)"; }
+            _oaHistory.RemoveAt(_oaHistory.Count - 1);
+            return "(остановлено)";
         }
-        catch (AnthropicApiException ex)
+        catch (System.Net.Http.HttpRequestException ex)
         {
-            _history.RemoveAt(_history.Count - 1);
-            throw new InvalidOperationException("Ошибка API: " + ex.Message, ex);
+            _oaHistory.RemoveAt(_oaHistory.Count - 1);
+            throw new InvalidOperationException("Нет связи с сервером нейросети: " + ex.Message, ex);
         }
         catch
         {
-            if (_history.Count > 0 && _history[^1].Value is BetaUserMessageParam) _history.RemoveAt(_history.Count - 1);
+            if (_oaHistory.Count > 0 && _oaHistory[^1].Role == "user") _oaHistory.RemoveAt(_oaHistory.Count - 1);
             throw;
         }
         finally { Busy = false; }
-
-        void FlushText()
-        {
-            if (!inText) return;
-            inText = false;
-            // текущий текстовый блок — всё, что накопилось после предыдущих блоков
-            int already = 0;
-            foreach (var b in blocks) if (b.TryPickText(out var tb)) already += tb.Text.Length;
-            var s = text.ToString(already, text.Length - already);
-            if (s.Length > 0) blocks.Add(new BetaTextBlockParam { Text = s });
-        }
     }
 
-    static Effort ParseEffort(string e) => e.ToLowerInvariant() switch
+    const string FreeRouter = "openrouter/free";
+
+    System.Net.Http.HttpRequestMessage BuildRequest(AiProvider cfg, string model, string prov)
     {
-        "medium" => Effort.Medium,
-        "high" => Effort.High,
-        "max" => Effort.Max,
-        _ => Effort.Low,
-    };
+        using var body = new System.IO.MemoryStream();
+        using (var w = new System.Text.Json.Utf8JsonWriter(body))
+        {
+            w.WriteStartObject();
+            w.WriteString("model", model);
+            w.WriteBoolean("stream", true);
+            w.WriteStartArray("messages");
+            if (!string.IsNullOrWhiteSpace(_settings.SystemPrompt))
+            { w.WriteStartObject(); w.WriteString("role", "system"); w.WriteString("content", _settings.SystemPrompt); w.WriteEndObject(); }
+            foreach (var (role, t) in _oaHistory)
+            { w.WriteStartObject(); w.WriteString("role", role); w.WriteString("content", t); w.WriteEndObject(); }
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+        var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, cfg.BaseUrl.Trim().TrimEnd('/') + "/chat/completions")
+        {
+            Content = new System.Net.Http.ByteArrayContent(body.ToArray()),
+        };
+        req.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cfg.Key.Trim());
+        if (prov == "openrouter") req.Headers.TryAddWithoutValidation("X-Title", "Island");
+        return req;
+    }
+
+    static string FriendlyError(int code, string body)
+    {
+        string msg = body;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var e))
+                msg = e.ValueKind == System.Text.Json.JsonValueKind.Object && e.TryGetProperty("message", out var m) ? m.GetString() ?? body : e.ToString();
+        }
+        catch { }
+        if (msg.Length > 300) msg = msg[..300] + "…";
+        return code switch
+        {
+            401 => "Ключ не подошёл (401). Проверь его в настройках.",
+            402 => "На балансе нет денег (402). Бесплатные модели OpenRouter оканчиваются на «:free».",
+            404 => "Модель не найдена (404): " + msg + "\nБесплатные модели меняются — выбери другую на openrouter.ai/models?max_price=0",
+            429 => "Лимит бесплатных запросов исчерпан (429) — подожди минуту и повтори.",
+            _ => $"Ошибка {code}: {msg}",
+        };
+    }
 }

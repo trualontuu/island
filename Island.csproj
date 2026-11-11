@@ -27,7 +27,7 @@
          Замеры (приватная память после старта):
            сжатый single-file — 255 МБ (сборки распаковываются в RAM) → не используем;
            ReadyToRun — 68 МБ и 313 МБ на диске; без R2R — 50 МБ и 165 МБ → берём без R2R.
-         Тримминг ломает JSON-рефлексию (настройки, SDK Anthropic) → выключен. -->
+         Тримминг ломает JSON-рефлексию (настройки) → выключен. -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
@@ -43,7 +43,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Anthropic" Version="13.8.0" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>

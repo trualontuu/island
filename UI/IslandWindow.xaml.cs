@@ -108,7 +108,7 @@ public partial class IslandWindow : Window
     /// <summary>Закрытие по повторному запуску exe: глазки засыпают, «Пока!» — и выход.</summary>
     public void Goodbye()
     {
-        if (_hiddenByFullscreen || _userHidden) { Application.Current.Shutdown(); return; }
+        if (_hiddenByFullscreen || _userHidden || _asleep) { Application.Current.Shutdown(); return; }
         Collapse();
         Toast("Пока!", null, Mood.Sleep, 5);
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
@@ -152,6 +152,7 @@ public partial class IslandWindow : Window
         Toast("Привет!", null, Mood.Happy, 2.2);
         _trimTimer.Start();
         _loadedDone = true;
+        StartIdleWatch();
     }
 
     public bool StartHidden;
@@ -328,6 +329,7 @@ public partial class IslandWindow : Window
     public void Expand(string page, bool activate = false)
     {
         if (_userHidden) ShowIsland();
+        Wake();
         _collapseTimer.Stop();
         _trimTimer.Stop();
         Hover(false);
@@ -521,6 +523,7 @@ public partial class IslandWindow : Window
         _toastTimer.Interval = TimeSpan.FromSeconds(seconds);
         _toastTimer.Start();
         if (_hiddenByFullscreen || _userHidden) return;
+        Wake(); // уведомление будит остров; когда исчезнет — снова уснёт, если мышь так и не трогали
         UpdateCompact();
         if (_expanded) MascotBig.Mood = mood;
     }
@@ -578,6 +581,7 @@ public partial class IslandWindow : Window
         else if (!fs && _hiddenByFullscreen)
         {
             _hiddenByFullscreen = false;
+            if (_asleep) return; // спит — покажется при движении мыши
             Show();
             PlaceWindow(_target);
             UpdateCompact(force: true);
@@ -688,6 +692,8 @@ public partial class IslandWindow : Window
     {
         if (_userHidden) return;
         _userHidden = true;
+        _idleTimer.Stop();
+        Wake(); // при _userHidden только сбрасывает позицию
         Collapse();
         _flyout?.Close2();
         _tick.Stop(); _toastTimer.Stop(); _collapseTimer.Stop();
@@ -717,6 +723,7 @@ public partial class IslandWindow : Window
         PlaceWindow(_target);
         UpdateCompact(force: true);
         UpdateTimers();
+        StartIdleWatch();
     }
 
     SettingsWindow? _settingsWnd;
@@ -736,6 +743,7 @@ public partial class IslandWindow : Window
         MascotSmall.Visibility = _s.Mascot ? Visibility.Visible : Visibility.Collapsed;
         _pinnedLoaded = false;
         UpdateCompact(force: true);
+        if (_loadedDone && !_userHidden) StartIdleWatch();
     }
 
     /// <summary>Микшер над треем (клик по значку громкости Windows).</summary>

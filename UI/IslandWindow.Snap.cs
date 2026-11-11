@@ -127,6 +127,50 @@ public partial class IslandWindow
                     log.AppendLine($"hidden cpu: {(pr.TotalProcessorTime - t0).TotalMilliseconds / sw.Elapsed.TotalMilliseconds / Environment.ProcessorCount * 100:F3}% (в тесте окно за экраном, WPF всё время переотправляет кадр — в реальном запуске 0%)  visible={IsVisible}");
                     ShowIsland(); await Task.Delay(600);
                     log.AppendLine($"after show: visible={IsVisible}");
+                    // спящий режим: «мышь не двигалась 20 с» → уезжает и прячется; уведомление и движение будят
+                    Island.Core.Native.GetCursorPos(out _lastCursor); _lastMove = Environment.TickCount64 - SleepAfterMs - 1;
+                    IdleTick(); await Task.Delay(700);
+                    log.AppendLine($"sleep: asleep={_asleep} visible={IsVisible} y={ShellSlide.Y:0} op={Shell.Opacity:0.00}");
+                    Toast("Будильник", null, Mood.Happy, 0.6); await Task.Delay(300);
+                    log.AppendLine($"toast wake: asleep={_asleep} visible={IsVisible}");
+                    await Task.Delay(1300); IdleTick(); await Task.Delay(700);
+                    log.AppendLine($"re-sleep: asleep={_asleep} visible={IsVisible}");
+                    _lastCursor.X += 5; IdleTick(); await Task.Delay(700);
+                    log.AppendLine($"move wake: asleep={_asleep} visible={IsVisible} y={ShellSlide.Y:0} op={Shell.Opacity:0.00}");
+                }
+            }
+
+            if (Environment.GetEnvironmentVariable("ISLAND_CHAT_TEST") == "1")
+            {
+                var keep = (_s.Provider, _s.Ai.TryGetValue("custom", out var kc) ? kc : null, _s.Ai.TryGetValue("openrouter", out var ko) ? ko : null);
+                try
+                {
+                    _s.Provider = "custom";
+                    _s.Ai["custom"] = new Island.Core.AiProvider { Key = "test-key", BaseUrl = "http://127.0.0.1:8799/v1", Model = "mock" };
+                    var streamed = new StringBuilder();
+                    var r1 = await _chat.SendAsync("первый", t => streamed.Append(t));
+                    var r2 = await _chat.SendAsync("второй", _ => { });
+                    log.AppendLine($"chat mock: r1='{r1}' streamed='{streamed}' r2='{r2}'");
+                    _chat.Reset();
+                    _s.Provider = "openrouter";
+                    _s.Ai["openrouter"] = new Island.Core.AiProvider { Key = "test-key", BaseUrl = "http://127.0.0.1:8799/v1", Model = "dead:free" };
+                    var r3 = await _chat.SendAsync("фолбэк", _ => { });
+                    log.AppendLine($"chat fallback: r3='{r3}'");
+                    _chat.Reset();
+                    var mig = new Island.Core.Settings(); mig.Ai["openrouter"] = new Island.Core.AiProvider { Model = "deepseek/deepseek-v4-flash:free" };
+                    log.AppendLine("migrated model: " + mig.AiFor("openrouter").Model);
+                    _s.Provider = "openrouter";
+                    _s.Ai["openrouter"] = new Island.Core.AiProvider { Key = "sk-or-invalid-test", BaseUrl = "https://openrouter.ai/api/v1", Model = "deepseek/deepseek-v4-flash:free" };
+                    try { await _chat.SendAsync("тест", _ => { }); log.AppendLine("openrouter: неожиданно ответил"); }
+                    catch (Exception ex) { log.AppendLine("openrouter bad key: " + ex.Message); }
+                }
+                catch (Exception ex) { log.AppendLine("chat test error: " + ex); }
+                finally
+                {
+                    _s.Provider = keep.Item1;
+                    if (keep.Item2 != null) _s.Ai["custom"] = keep.Item2; else _s.Ai.Remove("custom");
+                    if (keep.Item3 != null) _s.Ai["openrouter"] = keep.Item3; else _s.Ai.Remove("openrouter");
+                    _chat.Reset();
                 }
             }
 

@@ -193,7 +193,7 @@
         <!-- Сам остров -->
         <Grid x:Name="Shell" HorizontalAlignment="Center" VerticalAlignment="Top" Width="150" Height="32" Margin="0,6,0,0" ClipToBounds="True"
               RenderTransformOrigin="0.5,0" Cursor="Hand">
-            <Grid.RenderTransform><ScaleTransform x:Name="ShellScale" ScaleX="1" ScaleY="1"/></Grid.RenderTransform>
+            <Grid.RenderTransform><TransformGroup><ScaleTransform x:Name="ShellScale" ScaleX="1" ScaleY="1"/><TranslateTransform x:Name="ShellSlide"/></TransformGroup></Grid.RenderTransform>
             <Rectangle x:Name="ShellBg" Fill="Black" RadiusX="16" RadiusY="16" Stroke="#1AFFFFFF" StrokeThickness="1"/>
 
             <!-- ======== КОМПАКТНЫЙ ВИД ======== -->

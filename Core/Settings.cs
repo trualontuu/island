@@ -8,9 +8,11 @@ namespace Island.Core;
 
 public sealed class Settings
 {
-    public string ApiKey { get; set; } = "";
-    public string Model { get; set; } = "claude-opus-5-5";
-    public string Effort { get; set; } = "low";
+    /// <summary>Чем отвечает чат: openrouter | deepseek | custom.</summary>
+    public string Provider { get; set; } = "openrouter";
+    /// <summary>Ключ, адрес и модель для OpenAI-совместимых провайдеров (OpenRouter, DeepSeek, свой).</summary>
+    public Dictionary<string, AiProvider> Ai { get; set; } = new();
+
     public string SystemPrompt { get; set; } = "Ты — краткий помощник внутри «острова» Windows. Отвечай по-русски, коротко и по делу.";
 
     public string HotkeyShelf { get; set; } = "Alt+Space";
@@ -30,6 +32,8 @@ public sealed class Settings
     public bool SoftwareRendering { get; set; } = false;
     /// <summary>Клик по значку громкости Windows открывает наш микшер.</summary>
     public bool VolumeIconMixer { get; set; } = true;
+    /// <summary>Остров уезжает за край экрана, если мышь не двигалась 20 секунд.</summary>
+    public bool AutoSleep { get; set; } = true;
     public int AgentPort { get; set; } = 47321;
     public int ClipboardHistory { get; set; } = 30;
 
@@ -65,6 +69,38 @@ public sealed class Settings
         File.WriteAllText(FilePath, JsonSerializer.Serialize(this, Opts));
     }
 
-    public string EffectiveApiKey => !string.IsNullOrWhiteSpace(ApiKey) ? ApiKey.Trim()
-        : Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? "";
+    public AiProvider AiFor(string provider)
+    {
+        if (!Ai.TryGetValue(provider, out var a)) Ai[provider] = a = AiProvider.Preset(provider);
+        if (string.IsNullOrWhiteSpace(a.BaseUrl)) a.BaseUrl = AiProvider.Preset(provider).BaseUrl;
+        if (string.IsNullOrWhiteSpace(a.Model)) a.Model = AiProvider.Preset(provider).Model;
+        // бесплатный DeepSeek V4 Flash на OpenRouter стал платным — старое значение по умолчанию меняем на новое
+        if (provider == "openrouter" && a.Model == "deepseek/deepseek-v4-flash:free") a.Model = AiProvider.Preset(provider).Model;
+        return a;
+    }
+
+    /// <summary>Известный провайдер (старые настройки могли хранить «anthropic» — его больше нет).</summary>
+    public string ChatProvider => Provider is "openrouter" or "deepseek" or "custom" ? Provider : "openrouter";
+}
+
+public sealed class AiProvider
+{
+    public string Key { get; set; } = "";
+    public string BaseUrl { get; set; } = "";
+    public string Model { get; set; } = "";
+
+    public static AiProvider Preset(string p) => p switch
+    {
+        // бесплатные модели OpenRouter помечены «:free» (лимит запросов); список меняется — модель можно сменить в настройках
+        "openrouter" => new() { BaseUrl = "https://openrouter.ai/api/v1", Model = "google/gemma-4-31b-it:free" },
+        "deepseek" => new() { BaseUrl = "https://api.deepseek.com", Model = "deepseek-chat" },
+        _ => new() { BaseUrl = "https://api.openai.com/v1", Model = "" },
+    };
+
+    public static string KeyUrl(string p) => p switch
+    {
+        "openrouter" => "https://openrouter.ai/keys",
+        "deepseek" => "https://platform.deepseek.com/api_keys",
+        _ => "",
+    };
 }
