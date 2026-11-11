@@ -51,7 +51,7 @@ public sealed class SettingsWindow : Window
     static readonly int[] FpsChoices = { 0, 60, 75, 120, 144, 165, 240 };
 
     // переключатели
-    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!;
+    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!, _pass = null!, _passAll = null!;
     readonly TextBlock _claudeState = Hint(""), _ocState = Hint("");
 
     bool _loaded, _saved;
@@ -183,6 +183,11 @@ public sealed class SettingsWindow : Window
         var c1 = Card(beh, null);
         _autoExp = Switch(c1, "Раскрывать при наведении", "Подвёл курсор к острову — он раскрылся без клика. Увёл — свернулся.");
         Line(c1);
+        _pass = Switch(c1, "Не мешать вкладкам браузера", "Над браузером остров пропускает клики насквозь и бледнеет — вкладки под ним можно закрывать. Открыть: зажми Ctrl или Alt, или задержи на нём курсор");
+        _passAll = Switch(c1, "То же для всех окон", "Проводник, VS Code и другие программы со вкладками сверху");
+        _passAll.Margin = new Thickness(22, 0, 0, 0);
+        _pass.Click += (_, _) => _passAll.IsEnabled = _pass.IsChecked == true;
+        Line(c1);
         _sleep = Switch(c1, "Спящий режим", "Мышь не двигается 20 секунд — остров уезжает за край экрана и возвращается при движении");
         Line(c1);
         _hideFs = Switch(c1, "Прятать в полноэкранных играх и видео", null);
@@ -310,6 +315,7 @@ public sealed class SettingsWindow : Window
         _mic.IsChecked = _s.RecordMic; _hideFs.IsChecked = _s.HideInFullscreen; _eq.IsChecked = _s.AnimateEqualizer;
         _mascot.IsChecked = _s.Mascot; _auto.IsChecked = _s.Autostart; _volIcon.IsChecked = _s.VolumeIconMixer; _sleep.IsChecked = _s.AutoSleep;
         _autoExp.IsChecked = _s.AutoExpand; _bounce.IsChecked = _s.AnimBounce;
+        _pass.IsChecked = _s.ClickThrough; _passAll.IsChecked = _s.ClickThroughAll; _passAll.IsEnabled = _s.ClickThrough;
         var th = Theme.Get(_s.Theme).Id;
         foreach (var rb in _themeCards) rb.IsChecked = (string)rb.Tag == th;
         _opacity.Value = Math.Round(Math.Clamp(_s.Opacity, 0.3, 1) * 100);
@@ -376,6 +382,7 @@ public sealed class SettingsWindow : Window
         _s.RecordMic = _mic.IsChecked == true; _s.HideInFullscreen = _hideFs.IsChecked == true;
         _s.AnimateEqualizer = _eq.IsChecked == true; _s.Mascot = _mascot.IsChecked == true; _s.Autostart = _auto.IsChecked == true;
         _s.VolumeIconMixer = _volIcon.IsChecked == true; _s.AutoSleep = _sleep.IsChecked == true; _s.AutoExpand = _autoExp.IsChecked == true;
+        _s.ClickThrough = _pass.IsChecked == true; _s.ClickThroughAll = _passAll.IsChecked == true;
         _s.Theme = SelectedTheme(); _s.Opacity = _opacity.Value / 100.0; _s.Fps = SelectedFps();
         _s.AnimSpeed = (int)_anim.Value; _s.AnimBounce = _bounce.IsChecked == true;
         _s.PinnedApps = _pinned.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();

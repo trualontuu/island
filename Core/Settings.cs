@@ -36,6 +36,10 @@ public sealed class Settings
     public bool AutoSleep { get; set; } = true;
     /// <summary>Раскрывать остров, когда курсор подводят к нему (без клика).</summary>
     public bool AutoExpand { get; set; } = true;
+    /// <summary>Над браузером свёрнутый остров пропускает клики насквозь (не мешает закрывать вкладки).</summary>
+    public bool ClickThrough { get; set; } = true;
+    /// <summary>То же для любых окон, а не только браузеров (Проводник, VS Code…).</summary>
+    public bool ClickThroughAll { get; set; } = false;
     /// <summary>Цветовая тема (см. UI/Theme.cs).</summary>
     public string Theme { get; set; } = "black";
     /// <summary>Непрозрачность фона острова: 0.3–1.</summary>

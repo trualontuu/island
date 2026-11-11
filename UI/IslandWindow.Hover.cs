@@ -42,6 +42,19 @@ public partial class IslandWindow
             var zone = new Rect(r.Left - 28 * k, r.Top - 40 * k, r.Width + 56 * k, r.Height + 62 * k);
             bool inZone = zone.Contains(pt);
             if (!inZone) { _zoneSince = -1; _zoneArmed = true; }
+            else if (_passCtx)
+            {
+                // над браузером: зона вокруг — это вкладки, по ним не раскрываемся.
+                // Раскрываемся, только если курсор на самом острове и зажат Ctrl/Alt или курсор замер.
+                _zoneSince = -1;
+                var over = r; over.Inflate(4 * k, 4 * k);
+                if (_zoneArmed && over.Contains(pt) && !MouseDown() && (ModKey() || now - Math.Max(_lastMove, _passClickAt) >= PassDwellMs))
+                {
+                    _zoneArmed = false; _autoExpanded = true;
+                    SetPassing(false);
+                    Expand(_agent?.Pending != null ? "agent" : _page);
+                }
+            }
             else if (_zoneArmed && !MouseDown())
             {
                 if (_zoneSince < 0) _zoneSince = now;

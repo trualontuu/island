@@ -79,19 +79,30 @@ public partial class IslandWindow
                 var wall = System.Diagnostics.Stopwatch.StartNew();
                 var cur = new System.Collections.Generic.List<double>();
                 double lw = 0, start = 0; bool on = false;
-                EventHandler h = (_, _) => { double n = wall.Elapsed.TotalMilliseconds; if (on && n - start < 300) { cur.Add(n - lw); } lw = n; };
+                var at = new System.Collections.Generic.List<double>();
+                EventHandler h = (_, _) => { double n = wall.Elapsed.TotalMilliseconds; if (on && n - start < 300) { cur.Add(n - lw); at.Add(n - start); } lw = n; };
                 CompositionTarget.Rendering += h;
+                // какие операции диспетчера дольше 4 мс (что именно тормозит кадр)
+                var ops = new System.Collections.Generic.List<string>();
+                var opSw = new System.Collections.Generic.Dictionary<System.Windows.Threading.DispatcherOperation, double>();
+                Dispatcher.Hooks.OperationStarted += (_, e) => opSw[e.Operation] = wall.Elapsed.TotalMilliseconds;
+                Dispatcher.Hooks.OperationCompleted += (_, e) =>
+                {
+                    if (!opSw.Remove(e.Operation, out var t1)) return;
+                    double d = wall.Elapsed.TotalMilliseconds - t1;
+                    if (on && d > 4) { var m = e.Operation.GetType().GetField("_method", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(e.Operation) as Delegate; ops.Add($"{t1 - start:0}:{d:0.0}:{e.Operation.Priority}:{m?.Method.DeclaringType?.Name}.{m?.Method.Name}"); }
+                };
                 var all = new System.Collections.Generic.List<double>();
                 async Task Step(string name, Action act)
                 {
-                    cur.Clear(); start = lw = wall.Elapsed.TotalMilliseconds; on = true;
+                    cur.Clear(); at.Clear(); ops.Clear(); start = lw = wall.Elapsed.TotalMilliseconds; on = true;
                     var t0 = wall.Elapsed.TotalMilliseconds; act(); var tAct = wall.Elapsed.TotalMilliseconds - t0;
                     await Task.Delay(450); on = false;
                     all.AddRange(cur);
-                    log.AppendLine($"  {name,-16} call={tAct:F1}ms frames={cur.Count} max={(cur.Count > 0 ? cur.Max() : 0):F1} >8ms={cur.Count(x => x > 8)} first3=[{string.Join(", ", cur.Take(3).Select(x => x.ToString("F1")))}]");
+                    log.AppendLine($"  {name,-16} call={tAct:F1}ms frames={cur.Count} max={(cur.Count > 0 ? cur.Max() : 0):F1} >8ms={cur.Count(x => x > 8)} first3=[{string.Join(", ", cur.Take(3).Select(x => x.ToString("F1")))}] spikes=[{string.Join(" ", cur.Select((x, i) => (x, i)).Where(q => q.x > 8).Select(q => $"{at[q.i]:0}:{q.x:0.0}"))}] ops=[{string.Join(" ", ops)}]");
                 }
                 await Step("expand home", () => Expand("home"));
-                foreach (var pg in new[] { "sound", "control", "home", "system", "shelf", "chat", "home" }) await Step("→ " + pg, () => Expand(pg));
+                foreach (var pg in new[] { "sound", "control", "home", "system", "shelf", "chat", "home", "sound", "control", "system", "home" }) await Step("→ " + pg, () => Expand(pg));
                 await Step("collapse", Collapse);
                 await Step("expand home", () => Expand("home"));
                 CompositionTarget.Rendering -= h;
@@ -172,6 +183,27 @@ public partial class IslandWindow
                         bool rearmedOpen = _expanded;
                         log.AppendLine($"autoexpand: opened={opened} closed={closed} reopen={rearmedOpen}");
                         Collapse(); _hoverTest = false; await Task.Delay(600);
+                    }
+                    // «не мешать вкладкам»: курсор над островом над браузером → клики насквозь; замер на 600 мс → раскрылся
+                    {
+                        _idleTimer.Stop(); _hoverTest = true; _passForce = true; var keepCt = _s.ClickThrough; _s.ClickThrough = true;
+                        var c = Shell.PointToScreen(new Point(Shell.ActualWidth / 2, Shell.ActualHeight / 2));
+                        var on = new Island.Core.Native.POINT { X = (int)c.X, Y = (int)c.Y };
+                        var far = new Island.Core.Native.POINT { X = (int)c.X, Y = (int)c.Y + 900 };
+                        long p0 = Environment.TickCount64;
+                        _lastMove = p0; _zoneArmed = true;
+                        PassTick(on); HoverTick(on, p0 + 100);
+                        int ex = Island.Core.Native.GetWindowLong(_hwnd, Island.Core.Native.GWL_EXSTYLE);
+                        await Task.Delay(400);
+                        log.AppendLine($"pass: passing={_passing} transparent={(ex & Island.Core.Native.WS_EX_TRANSPARENT) != 0} op={Opacity:0.00} exp={_expanded} (ждём: True True 0.28 False)");
+                        PassTick(on); HoverTick(on, p0 + 700);
+                        await Task.Delay(500);
+                        ex = Island.Core.Native.GetWindowLong(_hwnd, Island.Core.Native.GWL_EXSTYLE);
+                        log.AppendLine($"pass dwell: exp={_expanded} passing={_passing} transparent={(ex & Island.Core.Native.WS_EX_TRANSPARENT) != 0} op={Opacity:0.00} (ждём: True False False 1.00)");
+                        Collapse(); await Task.Delay(600);
+                        PassTick(on); PassTick(far);
+                        log.AppendLine($"pass far: passing={_passing}");
+                        _passForce = false; _hoverTest = false; _s.ClickThrough = keepCt;
                     }
                     // спящий режим: «мышь не двигалась 20 с» → уезжает и прячется; уведомление и движение будят
                     Island.Core.Native.GetCursorPos(out _lastCursor); _lastMove = Environment.TickCount64 - SleepAfterMs - 1;

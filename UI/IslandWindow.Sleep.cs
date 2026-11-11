@@ -24,7 +24,8 @@ public partial class IslandWindow
     {
         if (!_idleHooked) { _idleHooked = true; _idleTimer.Tick += (_, _) => IdleTick(); }
         if (!_s.AutoSleep && _asleep) Wake();
-        if ((!_s.AutoSleep && !_s.AutoExpand) || _userHidden) { _idleTimer.Stop(); return; }
+        if (!_s.ClickThrough) SetPassing(false);
+        if ((!_s.AutoSleep && !_s.AutoExpand && !_s.ClickThrough) || _userHidden) { _idleTimer.Stop(); SetPassing(false); return; }
         Native.GetCursorPos(out _lastCursor);
         _lastMove = Environment.TickCount64;
         _idleTimer.Start();
@@ -41,9 +42,10 @@ public partial class IslandWindow
             if (_asleep) Wake();
         }
         else if (_s.AutoSleep && !_asleep && now - _lastMove >= SleepAfterMs && CanSleep()) Sleep();
-        // автораскрытие: рядом с островом опрашиваем часто (отклик), вдали — редко (нагрузка ~0)
-        bool near = _s.AutoExpand && HoverTick(p, now);
-        var want = TimeSpan.FromMilliseconds(near ? 15 : _s.AutoExpand ? 80 : 250);
+        // «не мешать вкладкам» + автораскрытие: рядом с островом опрашиваем часто (отклик), вдали — редко (нагрузка ~0)
+        bool near = PassTick(p);
+        near |= _s.AutoExpand && HoverTick(p, now);
+        var want = TimeSpan.FromMilliseconds(near ? 15 : _s.AutoExpand || _s.ClickThrough ? 80 : 250);
         if (_idleTimer.Interval != want) _idleTimer.Interval = want;
     }
 

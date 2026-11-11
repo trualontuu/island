@@ -194,7 +194,10 @@ public partial class IslandWindow : Window
     {
         if (_hwnd == IntPtr.Zero) return;
         var (b, s) = Monitor();
-        int w = (int)Math.Ceiling((shell.Width + Pad * 2) * s);
+        // Ширина окна всегда одна (под раскрытый остров): тогда X окна не меняется. Иначе при SetWindowPos слоёное окно
+        // на один кадр показывает старую картинку на новом месте — капсула «мигает» сбоку (тот самый 25-й кадр).
+        // Прозрачные пиксели клики не ловят, так что широкое окно ничему не мешает.
+        int w = (int)Math.Ceiling((Math.Max(shell.Width, ExpandedBox.Width) + Pad * 2) * s);
         int h = (int)Math.Ceiling((shell.Height + Pad + 6) * s);
         int x = b.Left + (b.W - w) / 2;
         // одинаковый SetWindowPos слоёного окна всё равно вызывает перерисовку и дёрганье — пропускаем
@@ -343,6 +346,7 @@ public partial class IslandWindow : Window
     {
         if (_userHidden) ShowIsland();
         Wake();
+        SetPassing(false);
         _collapseTimer.Stop();
         _trimTimer.Stop();
         Hover(false);
@@ -354,7 +358,7 @@ public partial class IslandWindow : Window
         {
             Fade(Compact, 0, 110, () => Compact.Visibility = Visibility.Collapsed);
             Expanded.Visibility = Visibility.Visible;
-            Fade(Expanded, 1, 220, null, 40);
+            Fade(Expanded, 1, 220, null);
             Shell.Cursor = Cursors.Arrow;
         }
         AnimateTo(PageSize(page), true);
@@ -432,7 +436,7 @@ public partial class IslandWindow : Window
         {
             UIElement pg = p switch { "chat" => PageChat, "control" => PageControl, "shelf" => PageShelf, "agent" => PageAgent, "sound" => PageSound, "system" => PageSystem, _ => PageHome };
             pg.Opacity = 0;
-            Fade(pg, 1, 280, null, 30);
+            Fade(pg, 1, 280, null); // без задержки: тяжёлый первый кадр слоя прозрачности — до начала движения, а не посреди него
         }
         switch (p)
         {
