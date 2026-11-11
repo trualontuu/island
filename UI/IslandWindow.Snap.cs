@@ -38,7 +38,7 @@ public partial class IslandWindow
                         var dec = System.Windows.Media.Imaging.BitmapDecoder.Create(System.IO.WindowsRuntimeStreamExtensions.AsStreamForRead(rs), System.Windows.Media.Imaging.BitmapCreateOptions.DelayCreation, System.Windows.Media.Imaging.BitmapCacheOption.None);
                         dims = $"{dec.Frames[0].PixelWidth}x{dec.Frames[0].PixelHeight}";
                     }
-                    log.AppendLine($"smtc: {ss.SourceAppUserModelId} thumb={dims} type={pp.PlaybackType} album='{pp.AlbumTitle}' tracks={pp.AlbumTrackCount} genres={pp.Genres.Count} status={ss.GetPlaybackInfo().PlaybackStatus} title='{pp.Title}' artist='{pp.Artist}'");
+                    log.AppendLine($"smtc: {ss.SourceAppUserModelId} thumb={dims} type={pp.PlaybackType} album='{pp.AlbumTitle}' tracks={pp.AlbumTrackCount} genres={pp.Genres.Count} status={ss.GetPlaybackInfo().PlaybackStatus} title='{pp.Title}' artist='{pp.Artist}' site={Island.Services.MediaService.SiteOf(pp.Title)} music={await Island.Services.MediaService.IsMusic(ss)}");
                 }
             }
             catch (Exception ex) { log.AppendLine("smtc err " + ex.Message); }

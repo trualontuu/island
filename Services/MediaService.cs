@@ -66,7 +66,7 @@ public sealed class MediaService
 
     /// <summary>Музыка ли это. YouTube в браузере Windows видит как «Music», поэтому у браузеров
     /// признак музыки — альбом (его заполняют YouTube Music, Яндекс Музыка в вебе и т.п., а обычное видео — нет).</summary>
-    static async Task<bool> IsMusic(GlobalSystemMediaTransportControlsSession s)
+    internal static async Task<bool> IsMusic(GlobalSystemMediaTransportControlsSession s)
     {
         try
         {
@@ -80,6 +80,12 @@ public sealed class MediaService
                 if (id.Contains(b))
                 {
                     if (!string.IsNullOrWhiteSpace(p.AlbumTitle)) return true;
+                    // Сайт по заголовку окна браузера (если вкладка с роликом открыта): YouTube Shorts и т.п.
+                    // тоже отдают квадратную обложку, так что одной формы обложки мало.
+                    var site = SiteOf(p.Title);
+                    if (site == Site.Video) return false;
+                    if (site == Site.Music) return true;
+                    if (HashTag.IsMatch(p.Title ?? "")) return false; // «#shorts #3дпечать» — признак ролика
                     // Музыкальные сайты (SoundCloud, ВК, YouTube Music…) отдают квадратную обложку,
                     // видео (YouTube и др.) — вытянутое превью 16:9 / 4:3. Результат кэшируем по треку.
                     string key = id + "|" + p.Title + "|" + p.Artist;
@@ -95,6 +101,43 @@ public sealed class MediaService
     }
 
     static readonly System.Collections.Generic.Dictionary<string, bool> _squareCache = new();
+
+    internal enum Site { Unknown, Music, Video }
+    static readonly System.Text.RegularExpressions.Regex HashTag = new(@"(^|\s)#\w", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    static readonly string[] MusicSites = { "YouTube Music", "SoundCloud", "Яндекс Музыка", "Яндекс.Музыка", "Spotify", "Deezer", "Bandcamp", "Zvuk", "Звук", "VK Музыка", "VK Music" };
+    static readonly string[] VideoSites = { "YouTube", "VK Видео", "VK Video", "VK Клипы", "VK Clips", "Rutube", "Twitch", "TikTok", "Кинопоиск", "Дзен", "Dzen", "Vimeo", "Netflix", "Okko" };
+
+    delegate bool EnumProc(IntPtr h, IntPtr l);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool EnumWindows(EnumProc cb, IntPtr l);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern int GetWindowTextLength(IntPtr h);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern int GetWindowText(IntPtr h, System.Text.StringBuilder sb, int max);
+
+    /// <summary>Ищет окно браузера, где активна вкладка с этим названием, и определяет сайт по хвосту заголовка
+    /// («Название - YouTube - Google Chrome»).</summary>
+    internal static Site SiteOf(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return Site.Unknown;
+        string probe = title.Trim();
+        if (probe.Length > 30) probe = probe[..30];
+        var found = Site.Unknown;
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h)) return true;
+            int n = GetWindowTextLength(h);
+            if (n < probe.Length || n > 2000) return true;
+            var sb = new System.Text.StringBuilder(n + 1);
+            GetWindowText(h, sb, sb.Capacity);
+            var t = sb.ToString();
+            int i = t.IndexOf(probe, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return true;
+            var tail = t[(i + probe.Length)..];
+            foreach (var m in MusicSites) if (tail.Contains(m, StringComparison.OrdinalIgnoreCase)) { found = Site.Music; return false; }
+            foreach (var v in VideoSites) if (tail.Contains(v, StringComparison.OrdinalIgnoreCase)) { found = Site.Video; return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
 
     static async Task<bool> IsSquare(Windows.Storage.Streams.IRandomAccessStreamReference r)
     {
