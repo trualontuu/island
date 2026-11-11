@@ -104,7 +104,7 @@ public partial class IslandWindow
             Child = tb, CornerRadius = new CornerRadius(16), Padding = new Thickness(12, 8, 12, 8), MaxWidth = 520,
             Margin = new Thickness(user ? 80 : 0, 4, user ? 0 : 60, 4),
             HorizontalAlignment = user ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-            Background = user ? new SolidColorBrush(Color.FromRgb(10, 132, 255)) : (Brush)FindResource("Card"),
+            Background = user ? (Brush)FindResource("Accent") : (Brush)FindResource("Card"),
         };
         if (!user && text.Length == 0) tb.Text = "";
         ChatList.Children.Add(b);

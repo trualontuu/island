@@ -21,7 +21,11 @@ public partial class App : Application
         {
             base.OnStartup(e);
             _host = new SystemHost();
-            _island = new IslandWindow(Settings.Load(), _host) { SnapDir = e.Args[1], ShowActivated = false };
+            var ss = Settings.Load();
+            if (Environment.GetEnvironmentVariable("ISLAND_THEME") is { Length: > 0 } th) ss.Theme = th;
+            if (double.TryParse(Environment.GetEnvironmentVariable("ISLAND_OPACITY"), System.Globalization.CultureInfo.InvariantCulture, out var op)) ss.Opacity = op;
+            Island.UI.Theme.Apply(ss);
+            _island = new IslandWindow(ss, _host) { SnapDir = e.Args[1], ShowActivated = false };
             _island.Show();
             return;
         }
@@ -40,6 +44,7 @@ public partial class App : Application
 
         base.OnStartup(e);
         var settings = Settings.Load();
+        Island.UI.Theme.Apply(settings);
         _host = new SystemHost();
         _island = new IslandWindow(settings, _host);
         _host.TrayLeftClick += () => _island.Expand("home", true);

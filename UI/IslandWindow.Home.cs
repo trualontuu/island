@@ -22,6 +22,7 @@ public partial class IslandWindow
     {
         if (_userHidden) return; // покажем актуальное при возврате (ShowIsland → UpdateCompact)
         if (_expanded && _page == "home") RefreshMedia();
+        else PrepareGlow();
         UpdateTimers();
         if (!_expanded) UpdateCompact();
     }
@@ -42,13 +43,33 @@ public partial class IslandWindow
         MediaApp.Text = i.App;
         MediaAppBadge.Visibility = i.HasMedia && i.App.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         CoverBigBrush.ImageSource = i.Cover;
-        if (!ReferenceEquals(_glowFor, i.Cover)) { _glowFor = i.Cover; CoverGlow.Source = i.Cover == null ? null : MakeGlow(i.Cover); }
+        if (!ReferenceEquals(_glowFor, i.Cover)) SetGlow(i.Cover, i.Cover == null ? null : MakeGlow(i.Cover));
         CoverPlaceholder.Visibility = i.Cover == null ? Visibility.Visible : Visibility.Collapsed;
         PlayBtn.Content = i.IsPlaying ? "" : "";
         UpdateProgress();
     }
 
     ImageSource? _glowFor;
+
+    void SetGlow(ImageSource? cover, ImageSource? glow)
+    {
+        _glowFor = cover;
+        CoverGlow.Source = glow;
+        CoverShade.Visibility = cover == null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Размытый фон обложки считаем заранее, в простое после смены трека, — а не в момент раскрытия
+    /// (было ~15–20 мс задержки перед анимацией).</summary>
+    void PrepareGlow()
+    {
+        var cover = _media.Info.Cover;
+        if (ReferenceEquals(_glowFor, cover)) return;
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!ReferenceEquals(_media.Info.Cover, cover) || ReferenceEquals(_glowFor, cover)) return;
+            SetGlow(cover, cover == null ? null : MakeGlow(cover));
+        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+    }
 
     /// <summary>Размытая копия обложки 96×96 — рисуется один раз; растянутая на фон, она и так мягкая.</summary>
     static ImageSource? MakeGlow(ImageSource src)
@@ -76,7 +97,13 @@ public partial class IslandWindow
         MediaPos.Text = Fmt(pos);
         MediaDur.Text = dur.TotalSeconds > 0 ? Fmt(dur) : "";
         if (!_seeking) MediaSeek.Value = dur.TotalSeconds > 0 ? pos.TotalSeconds / dur.TotalSeconds : 0;
-        MediaSeek.IsEnabled = dur.TotalSeconds > 0;
+        bool can = dur.TotalSeconds > 0 && i.CanSeek;
+        if (MediaSeek.IsEnabled != can)
+        {
+            MediaSeek.IsEnabled = can;
+            MediaSeek.Opacity = can ? 1 : 0.45;
+            MediaSeek.ToolTip = can ? null : dur.TotalSeconds > 0 ? "Этот плеер не разрешает перематывать" : "Плеер не сообщает длину трека";
+        }
     }
 
     static string Fmt(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
@@ -85,11 +112,19 @@ public partial class IslandWindow
     void Next_Click(object s, RoutedEventArgs e) => _media.Next();
     void Prev_Click(object s, RoutedEventArgs e) => _media.Prev();
     void MediaSeek_Down(object s, MouseButtonEventArgs e) => _seeking = true;
-    void MediaSeek_Up(object s, MouseButtonEventArgs e)
+    async void MediaSeek_Up(object s, MouseButtonEventArgs e)
     {
-        _seeking = false;
         var d = _media.Info.Duration;
-        if (d.TotalSeconds > 0) _media.Seek(TimeSpan.FromSeconds(MediaSeek.Value * d.TotalSeconds));
+        if (d.TotalSeconds <= 0) { _seeking = false; return; }
+        var to = TimeSpan.FromSeconds(MediaSeek.Value * d.TotalSeconds);
+        MediaPos.Text = Fmt(to);
+        bool ok = await _media.SeekAsync(to);
+        _seeking = false;
+        if (!ok)
+        {
+            MediaArtist.Text = "Плеер не дал перемотать";
+            UpdateProgress();
+        }
     }
 
     // ---------------- громкость ----------------

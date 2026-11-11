@@ -23,7 +23,7 @@ public sealed class MixerFlyout : Window
     [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
     [StructLayout(LayoutKind.Sequential)] struct MARGINS { public int l, r, t, b; }
 
-    readonly MixerView _view = new() { Fps = 240 };
+    readonly MixerView _view = new() { Fps = Theme.Fps };
     readonly Border _card;
     readonly TranslateTransform _slide = new();
     DateTime _hiddenAt;

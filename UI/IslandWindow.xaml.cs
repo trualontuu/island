@@ -40,9 +40,9 @@ public partial class IslandWindow : Window
     readonly DispatcherTimer _agentDoneTimer = new() { Interval = TimeSpan.FromSeconds(8) };
     readonly DispatcherTimer _trimTimer = new(DispatcherPriority.ApplicationIdle) { Interval = TimeSpan.FromSeconds(8) };
 
-    static readonly Size SizeHome = new(690, 292), SizeChat = new(690, 460), SizeControl = new(690, 330), SizeShelf = new(690, 330), SizeAgent = new(690, 262), SizeSound = new(690, 470);
-    /// <summary>Частота кадров анимаций острова (монитор 240 Гц).</summary>
-    const int Fps = 240;
+    static readonly Size SizeHome = new(690, 292), SizeChat = new(690, 460), SizeControl = new(690, 330), SizeShelf = new(690, 330), SizeAgent = new(690, 262), SizeSound = new(690, 470), SizeSystem = new(690, 330);
+    /// <summary>Частота кадров анимаций: из настроек или частота монитора.</summary>
+    static int Fps => Theme.Fps;
     const double Pad = 24; // запас окна вокруг острова (тень/пружина)
 
     public IslandWindow(Settings s, SystemHost host)
@@ -57,6 +57,8 @@ public partial class IslandWindow : Window
         _rec.Error += m => Toast(m, "", Mood.Alert, 4);
 
         SourceInitialized += OnSourceInitialized;
+        // скруглённая обрезка карточки плеера: размытая обложка и затемнение не вылезают за углы
+        PlayerCard.SizeChanged += (_, e) => PlayerCard.Clip = new RectangleGeometry(new Rect(e.NewSize), 18, 18);
         Loaded += OnLoaded;
 
         Shell.MouseEnter += (_, _) => { _collapseTimer.Stop(); if (!_expanded) Hover(true); };
@@ -165,6 +167,7 @@ public partial class IslandWindow : Window
         if (!_host.RegisterHotkey(_s.HotkeyShelf, () => ToggleFromHotkey("shelf"))) failed.Add(_s.HotkeyShelf);
         if (!_host.RegisterHotkey(_s.HotkeyChat, () => ToggleFromHotkey("chat"))) failed.Add(_s.HotkeyChat);
         if (!_host.RegisterHotkey(_s.HotkeyScreenshot, () => Act_Region(this, new RoutedEventArgs()))) failed.Add(_s.HotkeyScreenshot);
+        if (!string.IsNullOrWhiteSpace(_s.HotkeySystem) && !_host.RegisterHotkey(_s.HotkeySystem, () => ToggleFromHotkey("system"))) failed.Add(_s.HotkeySystem);
         if (failed.Count > 0) Dispatcher.BeginInvoke(() => Toast("Занято: " + string.Join(", ", failed), "", Mood.Alert, 4), DispatcherPriority.Background);
     }
 
@@ -228,16 +231,23 @@ public partial class IslandWindow : Window
         bool grow = target.Width * target.Height > from.Width * from.Height;
         IEasingFunction ease;
         TimeSpan dur;
+        // Пружина вместо BackEase/Quintic: старт без рывка, мягкая остановка. Основное движение — первые ~45%
+        // длительности, дальше плавный «доезд», поэтому длительности больше, а ощущается быстро.
         if (expanded && wasExpanded)
         {
-            // вкладка → вкладка: плавно, без отскока (отскок по высоте и давал «дёрганье»)
-            ease = new QuinticEase { EasingMode = EasingMode.EaseOut };
-            dur = TimeSpan.FromMilliseconds(280);
+            // вкладка → вкладка: без отскока
+            ease = Theme.Spring(1.0, 7.0);
+            dur = Theme.Ms(520);
+        }
+        else if (expanded)
+        {
+            ease = Theme.Spring(0.8, 8.5); // раскрытие — быстрый старт, лёгкий отскок
+            dur = Theme.Ms(520);
         }
         else
         {
-            ease = new BackEase { Amplitude = grow ? (expanded ? 0.32 : 0.45) : 0.18, EasingMode = EasingMode.EaseOut };
-            dur = TimeSpan.FromMilliseconds(grow ? 430 : 330);
+            ease = Theme.Spring(grow ? 0.8 : 0.92, 7.2); // сворачивание и смена ширины капсулы
+            dur = Theme.Ms(grow ? 600 : 560);
         }
 
         double r = expanded ? 32 : Math.Min(16, target.Height / 2);
@@ -251,7 +261,7 @@ public partial class IslandWindow : Window
             ah.Completed += (_, _) => { if (_target == target && !_expanded) PlaceWindow(target); };
             Shell.BeginAnimation(WidthProperty, aw);
             Shell.BeginAnimation(HeightProperty, ah);
-            var ar = new DoubleAnimation(r, dur) { EasingFunction = new QuadraticEase() };
+            var ar = new DoubleAnimation(r, dur) { EasingFunction = Theme.Spring(1.0, 7.0) };
             Timeline.SetDesiredFrameRate(ar, Fps);
             ShellBg.BeginAnimation(System.Windows.Shapes.Rectangle.RadiusXProperty, ar);
             ShellBg.BeginAnimation(System.Windows.Shapes.Rectangle.RadiusYProperty, ar);
@@ -286,7 +296,8 @@ public partial class IslandWindow : Window
         {
             Expanded.Width = SizeSound.Width - 32; Expanded.Height = SizeSound.Height - 26;
             Expanded.Opacity = 0; Expanded.Visibility = Visibility.Visible;
-            UIElement[] pages = { PageHome, PageChat, PageControl, PageShelf, PageAgent, PageSound };
+            BuildSystem();
+            UIElement[] pages = { PageHome, PageChat, PageControl, PageShelf, PageAgent, PageSound, PageSystem };
             var vis = new Visibility[pages.Length];
             for (int i = 0; i < pages.Length; i++) vis[i] = pages[i].Visibility;
             foreach (var pg in pages)
@@ -296,6 +307,8 @@ public partial class IslandWindow : Window
                 Expanded.UpdateLayout();
             }
             for (int i = 0; i < pages.Length; i++) pages[i].Visibility = vis[i];
+            if (!_pinnedLoaded) LoadPinned(); // иконки приложений — тоже заранее, а не при первом раскрытии
+            PrepareGlow();
         }
         catch { }
         finally { if (!_expanded) Expanded.Visibility = Visibility.Collapsed; }
@@ -303,7 +316,7 @@ public partial class IslandWindow : Window
 
     void Hover(bool on)
     {
-        var a = new DoubleAnimation(on ? 1.06 : 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = new BackEase { Amplitude = 0.5, EasingMode = EasingMode.EaseOut } };
+        var a = new DoubleAnimation(on ? 1.05 : 1, Theme.Ms(460)) { EasingFunction = Theme.Spring(0.7, 7.5) };
         Timeline.SetDesiredFrameRate(a, Fps);
         ShellScale.BeginAnimation(ScaleTransform.ScaleXProperty, a);
         ShellScale.BeginAnimation(ScaleTransform.ScaleYProperty, a);
@@ -341,7 +354,7 @@ public partial class IslandWindow : Window
         {
             Fade(Compact, 0, 110, () => Compact.Visibility = Visibility.Collapsed);
             Expanded.Visibility = Visibility.Visible;
-            Fade(Expanded, 1, 220, null, 110);
+            Fade(Expanded, 1, 220, null, 40);
             Shell.Cursor = Cursors.Arrow;
         }
         AnimateTo(PageSize(page), true);
@@ -358,12 +371,14 @@ public partial class IslandWindow : Window
     {
         if (!_expanded) return;
         _expanded = false;
+        _autoExpanded = false;
         _collapseTimer.Stop();
         PageSound.Stop();
+        StopSystem();
         Keyboard.ClearFocus();
-        Fade(Expanded, 0, 100, () => Expanded.Visibility = Visibility.Collapsed);
+        Fade(Expanded, 0, 150, () => Expanded.Visibility = Visibility.Collapsed);
         Compact.Visibility = Visibility.Visible;
-        Fade(Compact, 1, 200, null, 140);
+        Fade(Compact, 1, 280, null, 120);
         Shell.Cursor = Cursors.Hand;
         UpdateCompact(force: true);
         UpdateTimers();
@@ -373,7 +388,7 @@ public partial class IslandWindow : Window
 
     static void Fade(UIElement el, double to, int ms, Action? done, int delay = 0)
     {
-        var a = new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { BeginTime = TimeSpan.FromMilliseconds(delay) };
+        var a = new DoubleAnimation(to, Theme.Ms(ms)) { BeginTime = Theme.Ms(delay), EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
         Timeline.SetDesiredFrameRate(a, Fps);
         if (done != null) a.Completed += (_, _) => { if (Math.Abs(el.Opacity - to) < 0.01) done(); };
         el.BeginAnimation(OpacityProperty, a);
@@ -386,13 +401,14 @@ public partial class IslandWindow : Window
         "shelf" => SizeShelf,
         "agent" => SizeAgent,
         "sound" => SizeSound,
+        "system" => SizeSystem,
         _ => SizeHome,
     };
 
     void SelectPage(string page)
     {
         _page = page;
-        var tab = page switch { "chat" => TabChat, "sound" => TabSound, "control" => TabControl, "shelf" => TabShelf, "agent" => TabAgent, _ => TabHome };
+        var tab = page switch { "chat" => TabChat, "sound" => TabSound, "control" => TabControl, "shelf" => TabShelf, "agent" => TabAgent, "system" => TabSystem, _ => TabHome };
         if (tab.IsChecked != true) tab.IsChecked = true; else ShowPage(page);
     }
 
@@ -409,12 +425,14 @@ public partial class IslandWindow : Window
         PageShelf.Visibility = p == "shelf" ? Visibility.Visible : Visibility.Collapsed;
         PageAgent.Visibility = p == "agent" ? Visibility.Visible : Visibility.Collapsed;
         PageSound.Visibility = p == "sound" ? Visibility.Visible : Visibility.Collapsed;
+        PageSystem.Visibility = p == "system" ? Visibility.Visible : Visibility.Collapsed;
         if (p == "sound") PageSound.Start(); else PageSound.Stop();
+        if (p == "system") StartSystem(); else StopSystem();
         if (_expanded)
         {
-            UIElement pg = p switch { "chat" => PageChat, "control" => PageControl, "shelf" => PageShelf, "agent" => PageAgent, "sound" => PageSound, _ => PageHome };
+            UIElement pg = p switch { "chat" => PageChat, "control" => PageControl, "shelf" => PageShelf, "agent" => PageAgent, "sound" => PageSound, "system" => PageSystem, _ => PageHome };
             pg.Opacity = 0;
-            Fade(pg, 1, 200, null, 40);
+            Fade(pg, 1, 280, null, 30);
         }
         switch (p)
         {
@@ -431,7 +449,7 @@ public partial class IslandWindow : Window
     {
         _pinned = !_pinned;
         PinBtn.Content = _pinned ? "" : "";
-        PinBtn.Foreground = _pinned ? new SolidColorBrush(Color.FromRgb(10, 132, 255)) : Brushes.White;
+        PinBtn.Foreground = _pinned ? (Brush)FindResource("Accent") : Brushes.White;
     }
 
     // =====================================================================
@@ -598,6 +616,7 @@ public partial class IslandWindow : Window
         bool active = a.Source.Length > 0;
         TabAgent.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
         TabAgentText.Text = " " + (a.Source.Length > 0 ? a.Source : "Агент");
+        TabAgent.ToolTip = a.Source.Length > 0 ? a.Source : "Агент"; // на вкладке только иконка — иначе не помещается
 
         if (a.Status == AgentStatus.Done) { _agentDoneTimer.Stop(); _agentDoneTimer.Start(); }
 
@@ -652,7 +671,7 @@ public partial class IslandWindow : Window
         {
             Content = new TextBlock { Text = text, FontSize = 12.5, FontWeight = primary ? FontWeights.SemiBold : FontWeights.Normal },
             Style = (Style)FindResource("Tile"), Padding = new Thickness(14, 7, 14, 7), Margin = new Thickness(0, 0, 6, 6),
-            Background = primary ? new SolidColorBrush(Color.FromRgb(10, 132, 255)) : new SolidColorBrush(Color.FromRgb(44, 44, 48)),
+            Background = primary ? (Brush)FindResource("Accent") : (Brush)FindResource("Tab"),
             Foreground = dim ? (Brush)FindResource("Dim") : Brushes.White,
         };
         b.Click += (_, _) => { _agent?.Answer(value); Toast(value == null ? "Ответь в терминале" : "Ответ отправлен", null, Mood.Happy, 1.6); };
@@ -700,6 +719,7 @@ public partial class IslandWindow : Window
         _toastText = null;
         SetEq(false);
         PageSound.Stop();
+        StopSystem();
         _volHook?.Dispose(); _volHook = null;         // перехват мыши у значка громкости
         if (_fs != null) { _fs.Changed -= OnFullscreenChanged; _fs.Dispose(); _fs = null; } // слежка за окнами
         _host.ClearHotkeys();
@@ -739,11 +759,25 @@ public partial class IslandWindow : Window
 
     public void ApplySettings()
     {
+        Theme.Apply(_s);
+        PageSound.Fps = Fps;
         RegisterHotkeys();
         MascotSmall.Visibility = _s.Mascot ? Visibility.Visible : Visibility.Collapsed;
         _pinnedLoaded = false;
         UpdateCompact(force: true);
         if (_loadedDone && !_userHidden) StartIdleWatch();
+    }
+
+    /// <summary>Кнопка в настройках: раскрыть и свернуть остров, чтобы увидеть выбранный характер анимаций.</summary>
+    public void PreviewAnimation()
+    {
+        if (_userHidden) return;
+        Wake();
+        if (_expanded) { Collapse(); return; }
+        Expand("home");
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1400) };
+        t.Tick += (_, _) => { t.Stop(); if (!Shell.IsMouseOver && !_pinned) Collapse(); };
+        t.Start();
     }
 
     /// <summary>Микшер над треем (клик по значку громкости Windows).</summary>

@@ -18,6 +18,9 @@ public sealed class MediaInfo
     public bool IsPlaying;
     public TimeSpan Position, Duration;
     public DateTime PositionStamp = DateTime.UtcNow;
+    /// <summary>Плеер разрешает перемотку; Start/MinSeek/MaxSeek — его шкала времени.</summary>
+    public bool CanSeek = true;
+    public TimeSpan Start, MinSeek, MaxSeek;
     public bool HasMedia => Title.Length > 0;
     public TimeSpan CurrentPosition => IsPlaying ? Position + (DateTime.UtcNow - PositionStamp) : Position;
 }
@@ -301,6 +304,7 @@ public sealed class MediaService
             if (pi == null) return;
             var pos = Info.CurrentPosition;
             Info.IsPlaying = pi.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            Info.CanSeek = pi.Controls.IsPlaybackPositionEnabled;
             Info.Position = pos; Info.PositionStamp = DateTime.UtcNow;
         }
         catch { }
@@ -313,10 +317,16 @@ public sealed class MediaService
         {
             var t = _session?.GetTimelineProperties();
             if (t == null) return;
+            Info.Start = t.StartTime; Info.MinSeek = t.MinSeekTime; Info.MaxSeek = t.MaxSeekTime;
             Info.Duration = t.EndTime - t.StartTime;
-            Info.Position = t.Position;
             var stamp = t.LastUpdatedTime.UtcDateTime;
-            Info.PositionStamp = stamp > DateTime.UtcNow || stamp.Year < 2000 ? DateTime.UtcNow : stamp;
+            // сразу после нашей перемотки некоторые плееры (Яндекс Музыка, браузеры) ещё отдают старую позицию —
+            // не откатываем ползунок назад, пока не придёт свежая
+            if (!(DateTime.UtcNow - _seekAt < TimeSpan.FromSeconds(4) && stamp < _seekAt))
+            {
+                Info.Position = t.Position - t.StartTime < TimeSpan.Zero ? TimeSpan.Zero : t.Position - t.StartTime;
+                Info.PositionStamp = stamp > DateTime.UtcNow || stamp.Year < 2000 ? DateTime.UtcNow : stamp;
+            }
         }
         catch { }
         Changed?.Invoke();
@@ -352,11 +362,36 @@ public sealed class MediaService
         if (_session != null) { try { await _session.TrySkipPreviousAsync(); } catch { } return; }
         WinampCmd(40044);
     }
-    public async void Seek(TimeSpan pos)
+    DateTime _seekAt;
+
+    /// <summary>Перемотка. false — плеер отказал (например, не разрешает перематывать).</summary>
+    public async Task<bool> SeekAsync(TimeSpan pos)
     {
-        if (_session != null) { try { await _session.TryChangePlaybackPositionAsync(pos.Ticks); } catch { } return; }
+        if (_session != null)
+        {
+            var s = _session;
+            // позиция — по шкале плеера (у некоторых она начинается не с нуля) и в пределах разрешённого
+            var target = Info.Start + pos;
+            if (Info.MaxSeek > Info.MinSeek) target = target < Info.MinSeek ? Info.MinSeek : target > Info.MaxSeek ? Info.MaxSeek : target;
+            bool ok = false;
+            for (int attempt = 0; attempt < 2 && !ok; attempt++)
+            {
+                try { ok = await s.TryChangePlaybackPositionAsync(target.Ticks); } catch { }
+                if (!ok) await Task.Delay(150);
+            }
+            if (ok)
+            {
+                // показываем новую позицию сразу, не дожидаясь, пока плеер пришлёт её сам
+                _seekAt = DateTime.UtcNow;
+                Info.Position = pos; Info.PositionStamp = _seekAt;
+                Changed?.Invoke();
+            }
+            return ok;
+        }
         var h = WinampWnd();
-        if (h != IntPtr.Zero) Native.SendMessage(h, 0x400, new IntPtr((int)pos.TotalMilliseconds), new IntPtr(106)); // IPC_JUMPTOTIME
+        if (h == IntPtr.Zero) return false;
+        Native.SendMessage(h, 0x400, new IntPtr((int)pos.TotalMilliseconds), new IntPtr(106)); // IPC_JUMPTOTIME
+        return true;
     }
 
     // ------------- Winamp / AIMP (Winamp API) -------------

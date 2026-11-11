@@ -32,7 +32,7 @@ public partial class MixerView : UserControl
     bool _live, _updating;
     float _masterShown;
     TimeSpan _lastFrame;
-    public int Fps { get; set; } = 240;
+    public int Fps { get; set; } = Theme.Fps;
     public bool Compact { get; set; }
 
     public MixerView() => InitializeComponent();

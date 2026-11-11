@@ -10,15 +10,12 @@
 
     <Window.Resources>
         <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
-        <SolidColorBrush x:Key="Card" Color="#1C1C1F"/>
-        <SolidColorBrush x:Key="CardHover" Color="#2A2A2E"/>
-        <SolidColorBrush x:Key="Dim" Color="#8E8E93"/>
         <SolidColorBrush x:Key="Line" Color="#26FFFFFF"/>
 
         <!-- Плитка быстрого действия -->
         <Style x:Key="Tile" TargetType="Button">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{StaticResource Card}"/>
+            <Setter Property="Background" Value="{DynamicResource Card}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template">
@@ -28,7 +25,7 @@
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Background" Value="{StaticResource CardHover}"/></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="b" Property="Background" Value="{DynamicResource CardHover}"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="b" Property="Opacity" Value="0.7"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -63,20 +60,20 @@
 
         <!-- Вкладка -->
         <Style x:Key="TabBtn" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{StaticResource Dim}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Dim}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="GroupName" Value="tabs"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="b" Background="Transparent" CornerRadius="12" Padding="10,5" Margin="0,0,4,0">
+                        <Border x:Name="b" Background="Transparent" CornerRadius="12" Padding="9,5" Margin="0,0,2,0">
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="White"/></Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="b" Property="Background" Value="#2C2C30"/>
+                                <Setter TargetName="b" Property="Background" Value="{DynamicResource Tab}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -114,7 +111,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="track" Width="36" Height="20" CornerRadius="10" Background="#3A3A3E">
+                        <Border x:Name="track" Width="36" Height="20" CornerRadius="10" Background="{DynamicResource Track}">
                             <Ellipse x:Name="knob" Width="16" Height="16" Fill="White" HorizontalAlignment="Left" Margin="2,0"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -136,7 +133,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
                         <Grid Height="14" Background="Transparent">
-                            <Border Height="5" CornerRadius="2.5" Background="#3A3A3E" VerticalAlignment="Center"/>
+                            <Border Height="5" CornerRadius="2.5" Background="{DynamicResource Track}" VerticalAlignment="Center"/>
                             <Track x:Name="PART_Track" VerticalAlignment="Center">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="Slider.DecreaseLarge" Focusable="False">
@@ -194,7 +191,7 @@
         <Grid x:Name="Shell" HorizontalAlignment="Center" VerticalAlignment="Top" Width="150" Height="32" Margin="0,6,0,0" ClipToBounds="True"
               RenderTransformOrigin="0.5,0" Cursor="Hand">
             <Grid.RenderTransform><TransformGroup><ScaleTransform x:Name="ShellScale" ScaleX="1" ScaleY="1"/><TranslateTransform x:Name="ShellSlide"/></TransformGroup></Grid.RenderTransform>
-            <Rectangle x:Name="ShellBg" Fill="Black" RadiusX="16" RadiusY="16" Stroke="#1AFFFFFF" StrokeThickness="1"/>
+            <Rectangle x:Name="ShellBg" Fill="{DynamicResource IslandBg}" RadiusX="16" RadiusY="16" Stroke="#1AFFFFFF" StrokeThickness="1"/>
 
             <!-- ======== КОМПАКТНЫЙ ВИД ======== -->
             <Grid x:Name="Compact" Margin="10,0,12,0" Height="32" VerticalAlignment="Top">
@@ -215,12 +212,12 @@
                            HorizontalAlignment="Center" Margin="10,0,4,0" TextTrimming="CharacterEllipsis"/>
                 <Grid Grid.Column="2" VerticalAlignment="Center">
                     <StackPanel x:Name="Eq" Orientation="Horizontal" Height="14" Visibility="Collapsed" VerticalAlignment="Center">
-                        <Rectangle x:Name="Eq1" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#FF5AC8FA" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.4"/></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle x:Name="Eq2" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#FF5AC8FA" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.8"/></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle x:Name="Eq3" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#FF5AC8FA" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.55"/></Rectangle.RenderTransform></Rectangle>
-                        <Rectangle x:Name="Eq4" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#FF5AC8FA" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.3"/></Rectangle.RenderTransform></Rectangle>
+                        <Rectangle x:Name="Eq1" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Eq}" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.4"/></Rectangle.RenderTransform></Rectangle>
+                        <Rectangle x:Name="Eq2" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Eq}" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.8"/></Rectangle.RenderTransform></Rectangle>
+                        <Rectangle x:Name="Eq3" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Eq}" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.55"/></Rectangle.RenderTransform></Rectangle>
+                        <Rectangle x:Name="Eq4" Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="{DynamicResource Eq}" Margin="1,0" RenderTransformOrigin="0.5,1"><Rectangle.RenderTransform><ScaleTransform ScaleY="0.3"/></Rectangle.RenderTransform></Rectangle>
                     </StackPanel>
-                    <TextBlock x:Name="CompactRight" FontSize="12" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock x:Name="CompactRight" FontSize="12" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <Button x:Name="RecStopBtn" Style="{StaticResource Icon}" Width="24" Height="24" FontSize="10" Content="&#xE71A;" Foreground="#FF3B30"
                             Visibility="Collapsed" Click="RecStop_Click" ToolTip="Остановить запись"/>
                 </Grid>
@@ -253,11 +250,14 @@
                         <RadioButton x:Name="TabControl" Style="{StaticResource TabBtn}" Checked="Tab_Checked" Tag="control">
                             <StackPanel Orientation="Horizontal"><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE705;" FontSize="13" VerticalAlignment="Center"/><TextBlock Text=" VPN" FontSize="13"/></StackPanel>
                         </RadioButton>
+                        <RadioButton x:Name="TabSystem" Style="{StaticResource TabBtn}" Checked="Tab_Checked" Tag="system">
+                            <StackPanel Orientation="Horizontal"><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE9D9;" FontSize="13" VerticalAlignment="Center"/><TextBlock Text=" Система" FontSize="13"/></StackPanel>
+                        </RadioButton>
                         <RadioButton x:Name="TabShelf" Style="{StaticResource TabBtn}" Checked="Tab_Checked" Tag="shelf">
                             <StackPanel Orientation="Horizontal"><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE77F;" FontSize="13" VerticalAlignment="Center"/><TextBlock Text=" Полка" FontSize="13"/></StackPanel>
                         </RadioButton>
                         <RadioButton x:Name="TabAgent" Style="{StaticResource TabBtn}" Checked="Tab_Checked" Tag="agent" Visibility="Collapsed">
-                            <StackPanel Orientation="Horizontal"><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE99A;" FontSize="13" VerticalAlignment="Center"/><TextBlock x:Name="TabAgentText" Text=" Агент" FontSize="13"/></StackPanel>
+                            <StackPanel Orientation="Horizontal"><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE99A;" FontSize="13" VerticalAlignment="Center"/><TextBlock x:Name="TabAgentText" Text=" Агент" FontSize="13" Visibility="Collapsed"/></StackPanel>
                         </RadioButton>
                     </StackPanel>
                 </DockPanel>
@@ -268,37 +268,37 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
 
                     <!-- плеер -->
-                    <Border Grid.Column="0" CornerRadius="18" Background="{StaticResource Card}" ClipToBounds="True" Margin="0,0,10,0">
+                    <Border x:Name="PlayerCard" Grid.Column="0" CornerRadius="18" Background="{DynamicResource Card}" ClipToBounds="True" Margin="0,0,10,0">
                         <Grid>
                             <!-- мягкое отражение обложки: размытый фон -->
                             <!-- размытие считается один раз при смене трека (MakeGlow), а не на каждом кадре -->
                             <Image x:Name="CoverGlow" Stretch="UniformToFill" Opacity="0.38" Margin="-20" RenderOptions.BitmapScalingMode="Linear"/>
                             <!-- затемнение: на светлых обложках текст остаётся читаемым -->
-                            <Rectangle Fill="#73000000" IsHitTestVisible="False"/>
+                            <Rectangle x:Name="CoverShade" Fill="#73000000" IsHitTestVisible="False" Visibility="Collapsed"/>
                             <Grid Margin="14">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <StackPanel Grid.RowSpan="2">
-                                    <Border x:Name="CoverBig" Width="72" Height="72" CornerRadius="12" Background="#2C2C30">
+                                    <Border x:Name="CoverBig" Width="72" Height="72" CornerRadius="12" Background="{DynamicResource Tab}">
                                         <Grid>
-                                            <TextBlock x:Name="CoverPlaceholder" FontFamily="{StaticResource Icons}" Text="&#xE8D6;" FontSize="26" Foreground="{StaticResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="CoverPlaceholder" FontFamily="{StaticResource Icons}" Text="&#xE8D6;" FontSize="26" Foreground="{DynamicResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             <Border CornerRadius="12"><Border.Background><ImageBrush x:Name="CoverBigBrush" Stretch="UniformToFill"/></Border.Background></Border>
                                         </Grid>
                                     </Border>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="12,2,0,0">
                                     <TextBlock x:Name="MediaTitle" Text="Ничего не играет" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock x:Name="MediaArtist" Text="Включи музыку — остров оживёт" FontSize="12.5" Foreground="{StaticResource Dim}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
+                                    <TextBlock x:Name="MediaArtist" Text="Включи музыку — остров оживёт" FontSize="12.5" Foreground="{DynamicResource Dim}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0"/>
                                     <Border x:Name="MediaAppBadge" HorizontalAlignment="Left" Background="#22FFFFFF" CornerRadius="6" Padding="6,1" Margin="0,6,0,0" Visibility="Collapsed">
                                         <TextBlock x:Name="MediaApp" FontSize="10.5" Foreground="#CCFFFFFF"/>
                                     </Border>
                                 </StackPanel>
                                 <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="MediaPos" Text="0:00" FontSize="10.5" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Width="34"/>
+                                    <TextBlock x:Name="MediaPos" Text="0:00" FontSize="10.5" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" Width="34"/>
                                     <Slider x:Name="MediaSeek" Grid.Column="1" Style="{StaticResource Thin}" Minimum="0" Maximum="1" Margin="4,0"
                                             PreviewMouseLeftButtonUp="MediaSeek_Up" PreviewMouseLeftButtonDown="MediaSeek_Down"/>
-                                    <TextBlock x:Name="MediaDur" Grid.Column="2" Text="0:00" FontSize="10.5" Foreground="{StaticResource Dim}" VerticalAlignment="Center" Width="34" TextAlignment="Right"/>
+                                    <TextBlock x:Name="MediaDur" Grid.Column="2" Text="0:00" FontSize="10.5" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" Width="34" TextAlignment="Right"/>
                                 </Grid>
                                 <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Center">
                                     <Button Style="{StaticResource Icon}" Content="&#xE892;" Click="Prev_Click"/>
@@ -338,13 +338,13 @@
                     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <ScrollViewer x:Name="ChatScroll" Style="{StaticResource Scroll}">
                         <StackPanel x:Name="ChatList" Margin="0,0,8,0">
-                            <TextBlock x:Name="ChatHint" Text="С возвращением, начинайте в любое время." Foreground="{StaticResource Dim}" FontSize="13" Margin="4,8"/>
+                            <TextBlock x:Name="ChatHint" Text="С возвращением, начинайте в любое время." Foreground="{DynamicResource Dim}" FontSize="13" Margin="4,8"/>
                         </StackPanel>
                     </ScrollViewer>
-                    <Border Grid.Row="1" Background="{StaticResource Card}" CornerRadius="16" Margin="0,10,0,0" Padding="12,4,4,4">
+                    <Border Grid.Row="1" Background="{DynamicResource Card}" CornerRadius="16" Margin="0,10,0,0" Padding="12,4,4,4">
                         <DockPanel>
-                            <Button x:Name="ChatSend" DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE724;" Background="#0A84FF" Width="32" Height="32" Click="ChatSend_Click" VerticalAlignment="Bottom"/>
-                            <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE710;" ToolTip="Новый чат" Width="32" Height="32" Click="ChatNew_Click" Foreground="{StaticResource Dim}" VerticalAlignment="Bottom"/>
+                            <Button x:Name="ChatSend" DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE724;" Background="{DynamicResource Accent}" Width="32" Height="32" Click="ChatSend_Click" VerticalAlignment="Bottom"/>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Content="&#xE710;" ToolTip="Новый чат" Width="32" Height="32" Click="ChatNew_Click" Foreground="{DynamicResource Dim}" VerticalAlignment="Bottom"/>
                             <Grid>
                                 <TextBlock x:Name="ChatPlaceholder" Text="Спросите что-нибудь…" Foreground="#66FFFFFF" FontSize="13.5" VerticalAlignment="Center" IsHitTestVisible="False" Margin="2,0"/>
                                 <TextBox x:Name="ChatInput" Background="Transparent" BorderThickness="0" Foreground="White" CaretBrush="White" FontSize="13.5"
@@ -360,25 +360,25 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
                     <!-- Happ -->
-                    <Border x:Name="HappCard" Background="{StaticResource Card}" CornerRadius="18" Padding="14,12" Margin="0,0,0,8">
+                    <Border x:Name="HappCard" Background="{DynamicResource Card}" CornerRadius="18" Padding="14,12" Margin="0,0,0,8">
                         <DockPanel>
                             <ToggleButton x:Name="HappToggle" DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="HappToggle_Click" ToolTip="Подключить / отключить"/>
                             <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Width="30" Height="30" FontSize="13" Content="&#xE8A7;" Margin="0,0,10,0" ToolTip="Открыть Happ — там выбор сервера" Click="HappOpen_Click"/>
-                            <Border Width="42" Height="42" CornerRadius="12" Background="#2C2C30">
+                            <Border Width="42" Height="42" CornerRadius="12" Background="{DynamicResource Tab}">
                                 <Image x:Name="HappIcon" Width="28" Height="28"/>
                             </Border>
                             <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Happ" FontSize="15" FontWeight="SemiBold"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                     <Ellipse x:Name="HappDot" Width="7" Height="7" Fill="#8E8E93" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="HappStatus" Text="Проверяю…" FontSize="12" Foreground="{StaticResource Dim}" Margin="6,0,0,0" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="HappStatus" Text="Проверяю…" FontSize="12" Foreground="{DynamicResource Dim}" Margin="6,0,0,0" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </StackPanel>
                         </DockPanel>
                     </Border>
 
                     <!-- остальные VPN Windows -->
-                    <Border Grid.Row="1" Background="{StaticResource Card}" CornerRadius="16" Padding="10">
+                    <Border Grid.Row="1" Background="{DynamicResource Card}" CornerRadius="16" Padding="10">
                         <DockPanel>
                             <DockPanel DockPanel.Dock="Top" Margin="4,0,2,4">
                                 <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Width="22" Height="22" FontSize="11" Content="&#xE713;" ToolTip="Параметры VPN Windows" Click="VpnSettings_Click"/>
@@ -402,7 +402,7 @@
                 <!-- ===== ПОЛКА ===== -->
                 <Grid x:Name="PageShelf" Grid.Row="1" Visibility="Collapsed">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <Border Background="{StaticResource Card}" CornerRadius="16" Padding="10" Margin="0,0,6,0">
+                    <Border Background="{DynamicResource Card}" CornerRadius="16" Padding="10" Margin="0,0,6,0">
                         <DockPanel>
                             <DockPanel DockPanel.Dock="Top" Margin="4,0,2,6">
                                 <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Width="22" Height="22" FontSize="11" Content="&#xE74D;" ToolTip="Очистить историю" Click="ClipClear_Click"/>
@@ -411,7 +411,7 @@
                             <ScrollViewer Style="{StaticResource Scroll}"><StackPanel x:Name="ClipList"/></ScrollViewer>
                         </DockPanel>
                     </Border>
-                    <Border x:Name="ShelfDrop" Grid.Column="1" Background="{StaticResource Card}" CornerRadius="16" Padding="10" BorderBrush="Transparent" BorderThickness="1.5">
+                    <Border x:Name="ShelfDrop" Grid.Column="1" Background="{DynamicResource Card}" CornerRadius="16" Padding="10" BorderBrush="Transparent" BorderThickness="1.5">
                         <DockPanel>
                             <DockPanel DockPanel.Dock="Top" Margin="4,0,2,6">
                                 <Button DockPanel.Dock="Right" Style="{StaticResource Icon}" Width="22" Height="22" FontSize="11" Content="&#xE74D;" ToolTip="Очистить полку" Click="ShelfClear_Click"/>
@@ -419,7 +419,7 @@
                                 <TextBlock Text="Полка для файлов" FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </DockPanel>
                             <Grid>
-                                <TextBlock x:Name="ShelfHint" Text="Перетащи файлы на остров —&#x0a;они подождут здесь" Foreground="{StaticResource Dim}" FontSize="12" TextAlignment="Center" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="ShelfHint" Text="Перетащи файлы на остров —&#x0a;они подождут здесь" Foreground="{DynamicResource Dim}" FontSize="12" TextAlignment="Center" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                 <ScrollViewer Style="{StaticResource Scroll}"><WrapPanel x:Name="ShelfList"/></ScrollViewer>
                             </Grid>
                         </DockPanel>
@@ -427,22 +427,25 @@
                 </Grid>
 
                 <!-- ===== АГЕНТ (Claude Code / opencode) ===== -->
-                <Border x:Name="PageAgent" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource Card}" CornerRadius="16" Padding="16,12">
+                <Border x:Name="PageAgent" Grid.Row="1" Visibility="Collapsed" Background="{DynamicResource Card}" CornerRadius="16" Padding="16,12">
                     <StackPanel>
                         <DockPanel>
-                            <TextBlock x:Name="AgentProject" DockPanel.Dock="Right" Foreground="{StaticResource Dim}" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="AgentProject" DockPanel.Dock="Right" Foreground="{DynamicResource Dim}" FontSize="12" VerticalAlignment="Center"/>
                             <TextBlock x:Name="AgentSource" Text="Claude Code" FontWeight="SemiBold" FontSize="14"/>
                         </DockPanel>
                         <TextBlock x:Name="AgentDetail" Foreground="#DDFFFFFF" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
                         <Border x:Name="AgentReqBox" Visibility="Collapsed" Margin="0,10,0,0" Background="#141416" CornerRadius="12" Padding="12,10">
                             <StackPanel>
                                 <TextBlock x:Name="AgentReqTitle" FontWeight="SemiBold" FontSize="13.5" TextWrapping="Wrap"/>
-                                <TextBlock x:Name="AgentReqDetail" Foreground="{StaticResource Dim}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" FontFamily="Cascadia Mono, Consolas"/>
+                                <TextBlock x:Name="AgentReqDetail" Foreground="{DynamicResource Dim}" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" FontFamily="Cascadia Mono, Consolas"/>
                                 <WrapPanel x:Name="AgentReqButtons" Margin="0,10,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>
                 </Border>
+
+                <!-- ===== СИСТЕМА (нагрузка на ПК) — карточки строятся в IslandWindow.System.cs ===== -->
+                <UniformGrid x:Name="PageSystem" Grid.Row="1" Rows="2" Columns="3" Visibility="Collapsed"/>
             </Grid>
         </Grid>
     </Grid>

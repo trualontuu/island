@@ -113,19 +113,19 @@
         </DockPanel>
 
         <!-- список устройств (раскрывается) -->
-        <Border x:Name="DevicePanel" DockPanel.Dock="Top" Background="#1C1C1F" CornerRadius="14" Padding="4" Margin="0,0,0,10" Visibility="Collapsed">
+        <Border x:Name="DevicePanel" DockPanel.Dock="Top" Background="{DynamicResource Card}" CornerRadius="14" Padding="4" Margin="0,0,0,10" Visibility="Collapsed">
             <StackPanel x:Name="DeviceList"/>
         </Border>
 
         <!-- общая громкость -->
-        <Border DockPanel.Dock="Top" Background="#1C1C1F" CornerRadius="16" Padding="12,10" Margin="0,0,0,8">
+        <Border DockPanel.Dock="Top" Background="{DynamicResource Card}" CornerRadius="16" Padding="12,10" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="44"/>
                 </Grid.ColumnDefinitions>
-                <Button x:Name="MasterMute" Style="{StaticResource Ico}" Width="38" Height="38" FontSize="17" Content="&#xE767;" Background="#2C2C30" Click="MasterMute_Click"/>
+                <Button x:Name="MasterMute" Style="{StaticResource Ico}" Width="38" Height="38" FontSize="17" Content="&#xE767;" Background="{DynamicResource Tab}" Click="MasterMute_Click"/>
                 <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
                     <TextBlock Text="Общая громкость" FontSize="12.5" FontWeight="SemiBold" Margin="2,0,0,2"/>
                     <Slider x:Name="MasterSlider" Style="{StaticResource Vol}" ValueChanged="MasterSlider_Changed"/>

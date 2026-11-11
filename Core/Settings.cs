@@ -34,6 +34,19 @@ public sealed class Settings
     public bool VolumeIconMixer { get; set; } = true;
     /// <summary>Остров уезжает за край экрана, если мышь не двигалась 20 секунд.</summary>
     public bool AutoSleep { get; set; } = true;
+    /// <summary>Раскрывать остров, когда курсор подводят к нему (без клика).</summary>
+    public bool AutoExpand { get; set; } = true;
+    /// <summary>Цветовая тема (см. UI/Theme.cs).</summary>
+    public string Theme { get; set; } = "black";
+    /// <summary>Непрозрачность фона острова: 0.3–1.</summary>
+    public double Opacity { get; set; } = 1.0;
+    /// <summary>Кадров в секунду для анимаций; 0 — как у монитора.</summary>
+    public int Fps { get; set; } = 0;
+    /// <summary>Характер анимаций: 0 — очень плавно, 50 — обычно, 100 — резко.</summary>
+    public int AnimSpeed { get; set; } = 50;
+    /// <summary>Лёгкий пружинный отскок при раскрытии.</summary>
+    public bool AnimBounce { get; set; } = true;
+    public string HotkeySystem { get; set; } = "Ctrl+Alt+P";
     public int AgentPort { get; set; } = 47321;
     public int ClipboardHistory { get; set; } = 30;
 

@@ -19,6 +19,29 @@ public partial class IslandWindow
         var log = new StringBuilder();
         try
         {
+            if (Environment.GetEnvironmentVariable("ISLAND_SNAP_QUICK") == "1")
+            {
+                if (Environment.GetEnvironmentVariable("ISLAND_SNAP_SETTINGS") == "1")
+                {
+                    var sw2 = new SettingsWindow(_s, this) { WindowStartupLocation = WindowStartupLocation.Manual, Left = -9000, Top = -3000, ShowActivated = false };
+                    sw2.Show(); await Task.Delay(500);
+                    sw2.SnapPages(dir);
+                    sw2.Close();
+                }
+                // быстрый прогон: тема/прозрачность — главная + система + капсула
+                await Task.Delay(400);
+                Snap(dir, "q_compact");
+                Expand("home"); await Task.Delay(900); Snap(dir, "q_home");
+                Expand("system"); await Task.Delay(3300); Snap(dir, "q_system");
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var cpu0 = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
+                for (int i = 0; i < 20; i++) _sys!.Sample();
+                log.AppendLine($"sysmon sample: {sw.Elapsed.TotalMilliseconds / 20:F2} ms wall, {(System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime - cpu0).TotalMilliseconds / 20:F2} ms cpu; cpu={_sys.CpuNow:0} ram={_sys.RamNow:0} gpu={_sys.GpuNow:0} disk={_sys.DiskNow:0} down={_sys.DownNow:0} tPdh={_sys.TPdh:F2} tNet={_sys.TNet:F2}");
+                log.AppendLine($"fps={Fps} theme={_s.Theme} opacity={_s.Opacity}");
+                File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString());
+                Application.Current.Shutdown();
+                return;
+            }
             _media.Changed += OnMediaChanged;
             await _media.InitAsync();
             _agent = new AgentServer(47399, Dispatcher);
@@ -39,6 +62,8 @@ public partial class IslandWindow
                         dims = $"{dec.Frames[0].PixelWidth}x{dec.Frames[0].PixelHeight}";
                     }
                     log.AppendLine($"smtc: {ss.SourceAppUserModelId} thumb={dims} type={pp.PlaybackType} album='{pp.AlbumTitle}' tracks={pp.AlbumTrackCount} genres={pp.Genres.Count} status={ss.GetPlaybackInfo().PlaybackStatus} title='{pp.Title}' artist='{pp.Artist}' site={Island.Services.MediaService.SiteOf(pp.Title)} music={await Island.Services.MediaService.IsMusic(ss)}");
+                    var tl = ss.GetTimelineProperties(); var pc = ss.GetPlaybackInfo().Controls;
+                    log.AppendLine($"  timeline: start={tl.StartTime} end={tl.EndTime} pos={tl.Position} minSeek={tl.MinSeekTime} maxSeek={tl.MaxSeekTime} upd={tl.LastUpdatedTime:HH:mm:ss} seekEnabled={pc.IsPlaybackPositionEnabled} next={pc.IsNextEnabled} prev={pc.IsPreviousEnabled}");
                 }
             }
             catch (Exception ex) { log.AppendLine("smtc err " + ex.Message); }
@@ -66,7 +91,7 @@ public partial class IslandWindow
                     log.AppendLine($"  {name,-16} call={tAct:F1}ms frames={cur.Count} max={(cur.Count > 0 ? cur.Max() : 0):F1} >8ms={cur.Count(x => x > 8)} first3=[{string.Join(", ", cur.Take(3).Select(x => x.ToString("F1")))}]");
                 }
                 await Step("expand home", () => Expand("home"));
-                foreach (var pg in new[] { "sound", "control", "home", "shelf", "chat", "home" }) await Step("→ " + pg, () => Expand(pg));
+                foreach (var pg in new[] { "sound", "control", "home", "system", "shelf", "chat", "home" }) await Step("→ " + pg, () => Expand(pg));
                 await Step("collapse", Collapse);
                 await Step("expand home", () => Expand("home"));
                 CompositionTarget.Rendering -= h;
@@ -75,10 +100,10 @@ public partial class IslandWindow
                 Collapse(); await Task.Delay(500);
             }
 
-            foreach (var p in new[] { "home", "control", "sound", "shelf" })
+            foreach (var p in new[] { "home", "control", "sound", "shelf", "system" })
             {
                 Expand(p);
-                await Task.Delay(p == "control" ? 6000 : 1200);
+                await Task.Delay(p == "control" ? 6000 : p == "system" ? 3200 : 1200);
                 Snap(dir, "2_" + p);
                 if (p == "sound")
                 {
@@ -127,6 +152,27 @@ public partial class IslandWindow
                     log.AppendLine($"hidden cpu: {(pr.TotalProcessorTime - t0).TotalMilliseconds / sw.Elapsed.TotalMilliseconds / Environment.ProcessorCount * 100:F3}% (в тесте окно за экраном, WPF всё время переотправляет кадр — в реальном запуске 0%)  visible={IsVisible}");
                     ShowIsland(); await Task.Delay(600);
                     log.AppendLine($"after show: visible={IsVisible}");
+                    // автораскрытие: курсор у острова → раскрылся; ушёл далеко → свернулся
+                    {
+                        _idleTimer.Stop(); // настоящий курсор далеко от тестового окна за экраном — не мешаем
+                        _hoverTest = true;
+                        var c = Shell.PointToScreen(new Point(Shell.ActualWidth / 2, Shell.ActualHeight + 10));
+                        var near = new Island.Core.Native.POINT { X = (int)c.X, Y = (int)c.Y };
+                        var far = new Island.Core.Native.POINT { X = (int)c.X, Y = (int)c.Y + 900 };
+                        long h0 = Environment.TickCount64;
+                        log.AppendLine($"hover pre: exp={_expanded} vis={IsVisible} asleep={_asleep} armed={_zoneArmed} since={_zoneSince} auto={_autoExpanded} md={MouseDown()} fs={_hiddenByFullscreen} ov={_overlayOpen} near={near.X},{near.Y}");
+                        bool n1 = HoverTick(near, h0); var s1 = _zoneSince; HoverTick(near, h0 + 200);
+                        log.AppendLine($"hover after: n1={n1} since1={s1} exp={_expanded} armed={_zoneArmed}");
+                        await Task.Delay(800);
+                        bool opened = _expanded;
+                        HoverTick(far, h0 + 1200); HoverTick(far, h0 + 1800);
+                        await Task.Delay(800);
+                        bool closed = !_expanded;
+                        HoverTick(near, h0 + 2700); HoverTick(near, h0 + 2900);
+                        bool rearmedOpen = _expanded;
+                        log.AppendLine($"autoexpand: opened={opened} closed={closed} reopen={rearmedOpen}");
+                        Collapse(); _hoverTest = false; await Task.Delay(600);
+                    }
                     // спящий режим: «мышь не двигалась 20 с» → уезжает и прячется; уведомление и движение будят
                     Island.Core.Native.GetCursorPos(out _lastCursor); _lastMove = Environment.TickCount64 - SleepAfterMs - 1;
                     IdleTick(); await Task.Delay(700);
