@@ -54,6 +54,7 @@ public partial class IslandWindow
 
     void Sleep()
     {
+        if (_upd?.Ready != null && _s.AutoUpdate) ApplyUpdate(); // отошёл от компьютера — самое время обновиться (при успехе процесс завершится)
         _asleep = true;
         SetEq(false);
         Slide(-(Math.Max(Shell.ActualHeight, 32) + 14), 0, 520, new CubicEase { EasingMode = EasingMode.EaseInOut },

@@ -17,7 +17,11 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        if (e.Args.Length == 2 && e.Args[0] == "--snap")
+        bool updated = Array.IndexOf(e.Args, "--after-update") >= 0;
+        if (updated) Island.Services.Updater.AfterUpdate(e.Args);
+
+        int snapAt = Array.IndexOf(e.Args, "--snap");
+        if (snapAt >= 0 && snapAt + 1 < e.Args.Length)
         {
             base.OnStartup(e);
             _host = new SystemHost();
@@ -25,7 +29,7 @@ public partial class App : Application
             if (Environment.GetEnvironmentVariable("ISLAND_THEME") is { Length: > 0 } th) ss.Theme = th;
             if (double.TryParse(Environment.GetEnvironmentVariable("ISLAND_OPACITY"), System.Globalization.CultureInfo.InvariantCulture, out var op)) ss.Opacity = op;
             Island.UI.Theme.Apply(ss);
-            _island = new IslandWindow(ss, _host) { SnapDir = e.Args[1], ShowActivated = false };
+            _island = new IslandWindow(ss, _host) { SnapDir = e.Args[snapAt + 1], ShowActivated = false, JustUpdated = updated };
             _island.Show();
             return;
         }
@@ -50,6 +54,7 @@ public partial class App : Application
         _host.TrayLeftClick += () => _island.Expand("home", true);
         _host.TrayRightClick += () => _island.ShowMenu();
         _host.ShowTray("Island");
+        _island.JustUpdated = updated;
         _island.StartHidden = hideArg; // «--hide» при первом запуске — стартуем сразу скрытым
         _island.Show();
 

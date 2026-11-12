@@ -76,7 +76,7 @@ public partial class IslandWindow : Window
             Collapse();
         };
         _tick.Tick += (_, _) => OnTick();
-        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); _toastText = null; UpdateCompact(); };
+        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); _toastText = null; _toastClick = null; UpdateCompact(); };
         _agentDoneTimer.Tick += (_, _) => { _agentDoneTimer.Stop(); _agent?.Dismiss(); };
         _trimTimer.Tick += (_, _) => { _trimTimer.Stop(); if (!_expanded) Native.TrimMemory(); };
 
@@ -149,9 +149,13 @@ public partial class IslandWindow : Window
         _ctl.VolumeChanged += (v, m) => Dispatcher.BeginInvoke(() => SetVolumeUi(v, m));
         RegisterHotkeys();
         if (_s.VolumeIconMixer) _volHook = new VolumeIconHook(() => Dispatcher.BeginInvoke(OpenFlyout));
+        InitMic();
+        LyricsOnMedia();
+        InitUpdater();
+        InitNet();
 
         if (StartHidden || _hideRequested) { _hideRequested = false; HideIsland(); return; }
-        Toast("Привет!", null, Mood.Happy, 2.2);
+        ShowUpdatedToast();
         _trimTimer.Start();
         _loadedDone = true;
         StartIdleWatch();
@@ -168,6 +172,7 @@ public partial class IslandWindow : Window
         if (!_host.RegisterHotkey(_s.HotkeyChat, () => ToggleFromHotkey("chat"))) failed.Add(_s.HotkeyChat);
         if (!_host.RegisterHotkey(_s.HotkeyScreenshot, () => Act_Region(this, new RoutedEventArgs()))) failed.Add(_s.HotkeyScreenshot);
         if (!string.IsNullOrWhiteSpace(_s.HotkeySystem) && !_host.RegisterHotkey(_s.HotkeySystem, () => ToggleFromHotkey("system"))) failed.Add(_s.HotkeySystem);
+        if (!string.IsNullOrWhiteSpace(_s.HotkeyMic) && !_host.RegisterHotkey(_s.HotkeyMic, ToggleMic)) failed.Add(_s.HotkeyMic);
         if (failed.Count > 0) Dispatcher.BeginInvoke(() => Toast("Занято: " + string.Join(", ", failed), "", Mood.Alert, 4), DispatcherPriority.Background);
     }
 
@@ -215,6 +220,9 @@ public partial class IslandWindow : Window
     {
         var from = new Size(Shell.ActualWidth > 0 ? Shell.ActualWidth : _target.Width, Shell.ActualHeight > 0 ? Shell.ActualHeight : _target.Height);
         if (Math.Abs(from.Width - target.Width) < 0.5 && Math.Abs(from.Height - target.Height) < 0.5 && _target == target) return;
+        // Уже едем ровно туда же — не перезапускаем. Иначе при смене трека (плеер шлёт 5–10 событий подряд)
+        // сворачивание каждый раз начиналось заново с нулевой скоростью: медленно и рывками.
+        if (_target == target && Environment.TickCount64 < _animUntil) return;
         _target = target;
         bool wasExpanded = from.Height > 100;
         // на время анимации окно — с запасом под «пружину»
@@ -255,6 +263,7 @@ public partial class IslandWindow : Window
 
         double r = expanded ? 32 : Math.Min(16, target.Height / 2);
         int gen = ++_animGen;
+        _animUntil = Environment.TickCount64 + (long)dur.TotalMilliseconds + 80;
         void Go()
         {
             if (gen != _animGen) return; // за это время уже попросили другую анимацию
@@ -275,6 +284,7 @@ public partial class IslandWindow : Window
     }
 
     int _animGen;
+    long _animUntil; // до какого момента идёт анимация размера (тяжёлую работу откладываем на потом)
     static void AfterFrames(int n, Action a)
     {
         TimeSpan last = TimeSpan.Zero;
@@ -332,6 +342,12 @@ public partial class IslandWindow : Window
     {
         if (_expanded) return;
         if (_rec.IsRecording && e.OriginalSource is DependencyObject d && IsInside(d, RecStopBtn)) return;
+        if (_toastText != null && _toastClick != null)
+        {
+            var act = _toastClick; _toastClick = null; _toastText = null; _toastTimer.Stop();
+            UpdateCompact(); act();
+            return;
+        }
         string page = _agent?.Pending != null ? "agent" : _page;
         Expand(page, activate: true);
     }
@@ -467,7 +483,9 @@ public partial class IslandWindow : Window
         CompactText.FontWeight = FontWeights.SemiBold;
         double minW = 140;
         Mood mood = Mood.Idle;
-        bool eq = false, idle = false;
+        bool eq = false, idle = false, fixedW = false;
+        _capsuleLyrics = false; _capsuleDownload = false;
+        CompactText.BeginAnimation(OpacityProperty, null); CompactText.Opacity = 1;
         CompactText.Visibility = Visibility.Visible;
 
         var a = _agent;
@@ -506,13 +524,32 @@ public partial class IslandWindow : Window
             ShowMascot(); mood = Mood.Thinking;
             CompactText.Text = "Думаю…"; CompactText.FontWeight = FontWeights.Normal;
         }
-        else if (_media.Info.IsPlaying && _media.Info.HasMedia)
+        else if (ShownDownload() != null)
+        {
+            CompactGlyph.Text = ""; CompactGlyph.Visibility = Visibility.Visible;
+            CompactText.Text = DownloadLine();
+            CompactText.FontWeight = FontWeights.Normal;
+            _capsuleDownload = true;
+            minW = 370; fixedW = true;
+        }
+        else if (MusicShown())
         {
             if (_media.Info.Cover != null) { CoverSmallBrush.ImageSource = _media.Info.Cover; CoverSmall.Visibility = Visibility.Visible; }
+            else if (CoverSmallBrush.ImageSource != null && !(_media.Info.IsPlaying && _media.Info.HasMedia)) CoverSmall.Visibility = Visibility.Visible; // смена трека: старая обложка, пока не пришла новая
             else { CompactGlyph.Text = ""; CompactGlyph.Visibility = Visibility.Visible; }
             CompactText.Visibility = Visibility.Collapsed;
             Eq.Visibility = Visibility.Visible; eq = true;
             minW = 108; // при музыке/видео — компактно: обложка + эквалайзер
+            if (_s.LyricsInCapsule && (_lyr?.Synced == true || (_lyrState == LyrState.Loading && _lyrKeepWide)))
+            {
+                // строчка песни: ширина постоянная, чтобы капсула не «дышала» на каждой строке
+                _capsuleLyrics = true;
+                if (_lyrIdx == -2 && _lyr != null) { var p = _media.Info.CurrentPosition + TimeSpan.FromSeconds(LyricLeadSec); _lyrIdx = _lyr.Lines.FindLastIndex(x => x.At <= p); }
+                CompactText.Text = CurrentLyric();
+                CompactText.FontWeight = FontWeights.Normal;
+                CompactText.Visibility = Visibility.Visible;
+                minW = 330; fixedW = true;
+            }
         }
         else
         {
@@ -529,18 +566,40 @@ public partial class IslandWindow : Window
         Grid.SetColumnSpan(CompactLeft, idle ? 3 : 1);
         CompactLeft.HorizontalAlignment = idle ? HorizontalAlignment.Center : HorizontalAlignment.Left;
 
+        UpdateMicMark();
+        LyricsTick();
         if (_expanded && !force) return;
         CompactText.MaxWidth = 300;
         Compact.Measure(new Size(double.PositiveInfinity, 32));
-        double w = idle ? 84 : Math.Max(minW, Compact.DesiredSize.Width + 22);
-        if (!_expanded) AnimateTo(new Size(Math.Ceiling(w), 32), false);
+        double w = idle ? 84 : fixedW ? minW : Math.Max(minW, Compact.DesiredSize.Width + 22);
+        if ((idle || fixedW) && MicMark.Visibility == Visibility.Visible) w += 14;
+        if (!_expanded && !_hiddenByFullscreen) AnimateTo(new Size(Math.Ceiling(w), 32), false); // скрыт в игре — догоним при показе
 
         void ShowMascot() { if (_s.Mascot) MascotSmall.Visibility = Visibility.Visible; }
+    }
+
+    // При смене трека плеер на мгновение сообщает «ничего не играет» — капсула не должна схлопываться в глазки и обратно.
+    const int MusicGraceMs = 1500;
+    long _musicSeen;
+    DispatcherTimer? _musicGrace;
+    bool MusicShown()
+    {
+        long now = Environment.TickCount64;
+        if (_media.Info.IsPlaying && _media.Info.HasMedia) { _musicSeen = now; _musicGrace?.Stop(); return true; }
+        if (_musicSeen == 0 || now - _musicSeen >= MusicGraceMs) return false;
+        if (_musicGrace == null)
+        {
+            _musicGrace = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(MusicGraceMs + 50) };
+            _musicGrace.Tick += (_, _) => { _musicGrace.Stop(); if (!_expanded) UpdateCompact(); };
+        }
+        _musicGrace.Stop(); _musicGrace.Start();
+        return true;
     }
 
     public void Toast(string text, string? glyph = null, Mood mood = Mood.Happy, double seconds = 2.5)
     {
         _toastText = text; _toastGlyph = glyph; _toastMood = mood;
+        _toastClick = null; // действие по клику — только у того уведомления, которое его задало (после вызова Toast)
         _toastTimer.Stop();
         _toastTimer.Interval = TimeSpan.FromSeconds(seconds);
         _toastTimer.Start();
@@ -593,16 +652,23 @@ public partial class IslandWindow : Window
     // =====================================================================
     void OnFullscreenChanged(bool fs)
     {
-        if (!_s.HideInFullscreen || _userHidden) return;
+        if (_userHidden) return;
+        // В игре мышь не должна проходить через наш хук (он нужен только для значка громкости на панели задач,
+        // а её в полноэкранной игре всё равно не видно) — снимаем его, чтобы не добавлять ни микросекунды к вводу.
+        if (fs) { _volHook?.Dispose(); _volHook = null; }
+        else if (_s.VolumeIconMixer && _volHook == null) _volHook = new VolumeIconHook(() => Dispatcher.BeginInvoke(OpenFlyout));
+        if (!_s.HideInFullscreen) return;
         if (fs && !_expanded && !_rec.IsRecording)
         {
             _hiddenByFullscreen = true;
             SetEq(false);
+            _idleTimer.Stop(); // в игре курсор не опрашиваем совсем
             Hide();
         }
         else if (!fs && _hiddenByFullscreen)
         {
             _hiddenByFullscreen = false;
+            StartIdleWatch();
             if (_asleep) return; // спит — покажется при движении мыши
             Show();
             PlaceWindow(_target);
@@ -629,7 +695,7 @@ public partial class IslandWindow : Window
         if (a.Pending != null && a.Pending != _shownRequest)
         {
             _shownRequest = a.Pending;
-            if (_hiddenByFullscreen) { Show(); _hiddenByFullscreen = false; }
+            if (_hiddenByFullscreen) { Show(); _hiddenByFullscreen = false; StartIdleWatch(); }
             Expand("agent");
         }
         else if (a.Pending == null && _shownRequest != null)
@@ -694,6 +760,7 @@ public partial class IslandWindow : Window
         Item("Настройки…", OpenSettings);
         Item("Папка снимков и записей", () => ControlService.OpenUri(EnsureFolder()));
         m.Items.Add(new Separator());
+        Item(_upd?.Ready is { } nv ? $"Установить версию {Updater.Show(nv)}" : $"Проверить обновления (версия {Updater.Show(Updater.Current)})", () => _ = CheckUpdate(manual: true));
         Item("Выход", () => Application.Current.Shutdown());
         Native.SetForegroundWindow(_hwnd);
         m.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
@@ -768,6 +835,7 @@ public partial class IslandWindow : Window
         RegisterHotkeys();
         MascotSmall.Visibility = _s.Mascot ? Visibility.Visible : Visibility.Collapsed;
         _pinnedLoaded = false;
+        if (_loadedDone) { LyricsOnMedia(); RebuildLyricsView(); UpdateMicButton(); InitNet(); }
         UpdateCompact(force: true);
         if (_loadedDone && !_userHidden) StartIdleWatch();
     }
@@ -798,6 +866,8 @@ public partial class IslandWindow : Window
         _agent?.Dispose();
         _fs?.Dispose();
         _volHook?.Dispose();
+        _mic?.Dispose();
+        _dl?.Dispose(); _net?.Dispose();
         _mixer.Dispose();
         _ctl.Dispose();
         base.OnClosed(e);

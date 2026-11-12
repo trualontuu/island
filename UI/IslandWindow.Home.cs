@@ -24,12 +24,14 @@ public partial class IslandWindow
         if (_expanded && _page == "home") RefreshMedia();
         else PrepareGlow();
         UpdateTimers();
+        LyricsOnMedia();
         if (!_expanded) UpdateCompact();
     }
 
     void RefreshHome()
     {
         RefreshMedia();
+        ApplyLyricsOpen();
         if (!_pinnedLoaded) LoadPinned();
         var (v, m) = _ctl.GetVolume();
         SetVolumeUi(v, m);
@@ -60,15 +62,23 @@ public partial class IslandWindow
 
     /// <summary>Размытый фон обложки считаем заранее, в простое после смены трека, — а не в момент раскрытия
     /// (было ~15–20 мс задержки перед анимацией).</summary>
+    /// Размытие стоит ~15 мс, поэтому ждём, пока плеер перестанет слать события и закончится анимация.
+    System.Windows.Threading.DispatcherTimer? _glowTimer;
     void PrepareGlow()
     {
-        var cover = _media.Info.Cover;
-        if (ReferenceEquals(_glowFor, cover)) return;
-        Dispatcher.BeginInvoke(() =>
+        if (ReferenceEquals(_glowFor, _media.Info.Cover)) return;
+        if (_glowTimer == null)
         {
-            if (!ReferenceEquals(_media.Info.Cover, cover) || ReferenceEquals(_glowFor, cover)) return;
-            SetGlow(cover, cover == null ? null : MakeGlow(cover));
-        }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            _glowTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.ApplicationIdle) { Interval = TimeSpan.FromMilliseconds(700) };
+            _glowTimer.Tick += (_, _) =>
+            {
+                if (Environment.TickCount64 < _animUntil) return; // ещё едем — попробуем на следующем тике
+                _glowTimer.Stop();
+                var cover = _media.Info.Cover;
+                if (!ReferenceEquals(_glowFor, cover)) SetGlow(cover, cover == null ? null : MakeGlow(cover));
+            };
+        }
+        _glowTimer.Stop(); _glowTimer.Start();
     }
 
     /// <summary>Размытая копия обложки 96×96 — рисуется один раз; растянутая на фон, она и так мягкая.</summary>

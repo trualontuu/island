@@ -199,6 +199,7 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Grid x:Name="CompactLeft" Grid.Column="0" VerticalAlignment="Center">
                     <ui:Mascot x:Name="MascotSmall" Width="26" Height="16"/>
@@ -220,6 +221,11 @@
                     <TextBlock x:Name="CompactRight" FontSize="12" Foreground="{DynamicResource Dim}" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <Button x:Name="RecStopBtn" Style="{StaticResource Icon}" Width="24" Height="24" FontSize="10" Content="&#xE71A;" Foreground="#FF3B30"
                             Visibility="Collapsed" Click="RecStop_Click" ToolTip="Остановить запись"/>
+                </Grid>
+                <!-- микрофон занят: оранжевая точка (как на iPhone); выключен — красный перечёркнутый значок -->
+                <Grid x:Name="MicMark" Grid.Column="3" VerticalAlignment="Center" Margin="7,0,0,0" Visibility="Collapsed">
+                    <Ellipse x:Name="MicDot" Width="7" Height="7" Fill="#FF9F0A"/>
+                    <TextBlock x:Name="MicOffGlyph" FontFamily="{StaticResource Icons}" Text="&#xF781;" FontSize="12" Foreground="#FF453A" Visibility="Collapsed"/>
                 </Grid>
             </Grid>
 
@@ -305,12 +311,14 @@
                                     <Button x:Name="PlayBtn" Style="{StaticResource Icon}" Width="38" Height="38" FontSize="20" Content="&#xE768;" Margin="10,0" Click="Play_Click"/>
                                     <Button Style="{StaticResource Icon}" Content="&#xE893;" Click="Next_Click"/>
                                 </StackPanel>
+                                <Button x:Name="LyricsBtn" Grid.Row="3" Grid.ColumnSpan="2" HorizontalAlignment="Right" Style="{StaticResource Icon}" Width="30" Height="30" FontSize="14"
+                                        Content="&#xE90B;" ToolTip="Текст песни" Click="Lyrics_Click"/>
                             </Grid>
                         </Grid>
                     </Border>
 
                     <!-- быстрые действия -->
-                    <UniformGrid Grid.Column="1" Rows="2" Columns="4">
+                    <UniformGrid x:Name="Tiles" Grid.Column="1" Rows="2" Columns="4">
                         <Button Style="{StaticResource Tile}" Margin="0,0,6,6" Click="Act_Region"><StackPanel><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE7A8;" FontSize="18" HorizontalAlignment="Center"/><TextBlock Text="Область" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource Tile}" Margin="0,0,6,6" Click="Act_Full"><StackPanel><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE740;" FontSize="18" HorizontalAlignment="Center"/><TextBlock Text="Весь экран" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Center"/></StackPanel></Button>
                         <Button Style="{StaticResource Tile}" Margin="0,0,6,6" Click="Act_Ocr"><StackPanel><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE8D2;" FontSize="18" HorizontalAlignment="Center"/><TextBlock Text="Текст с экрана" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Center"/></StackPanel></Button>
@@ -321,9 +329,29 @@
                         <Button Style="{StaticResource Tile}" Click="Act_Folder"><StackPanel><TextBlock FontFamily="{StaticResource Icons}" Text="&#xE8B7;" FontSize="18" HorizontalAlignment="Center"/><TextBlock Text="Снимки" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Center"/></StackPanel></Button>
                     </UniformGrid>
 
+                    <!-- текст песни: на месте плиток -->
+                    <Border x:Name="LyricsView" Grid.Column="1" CornerRadius="18" Background="{DynamicResource Card}" ClipToBounds="True" Visibility="Collapsed"
+                            MouseWheel="Lyrics_Wheel">
+                        <Grid>
+                            <Canvas x:Name="LyricsCanvas" ClipToBounds="True" Margin="18,10">
+                                <Canvas.OpacityMask>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="Transparent" Offset="0"/><GradientStop Color="Black" Offset="0.16"/>
+                                        <GradientStop Color="Black" Offset="0.84"/><GradientStop Color="Transparent" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Canvas.OpacityMask>
+                                <StackPanel x:Name="LyricsList" Width="{Binding ActualWidth, ElementName=LyricsCanvas}">
+                                    <StackPanel.RenderTransform><TranslateTransform x:Name="LyricsShift"/></StackPanel.RenderTransform>
+                                </StackPanel>
+                            </Canvas>
+                            <TextBlock x:Name="LyricsStatus" FontSize="13" Foreground="{DynamicResource Dim}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
                     <!-- закреплённые приложения + громкость -->
                     <DockPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="2,12,2,0">
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Width="200">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="MicBtn" Style="{StaticResource Icon}" Width="28" Height="28" Content="&#xE720;" Click="Mic_Click" Margin="0,0,6,0"/>
                             <Button x:Name="MuteBtn" Style="{StaticResource Icon}" Width="28" Height="28" Content="&#xE767;" Click="Mute_Click"/>
                             <Slider x:Name="VolSlider" Style="{StaticResource Thin}" Width="160" Minimum="0" Maximum="1" VerticalAlignment="Center" ValueChanged="Vol_Changed"/>
                         </StackPanel>

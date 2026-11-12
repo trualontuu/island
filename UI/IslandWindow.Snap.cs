@@ -19,6 +19,28 @@ public partial class IslandWindow
         var log = new StringBuilder();
         try
         {
+            // автообновление: скачать последнюю сборку (даже той же версии), подменить свой exe и запустить новую копию
+            if (Environment.GetEnvironmentVariable("ISLAND_UPD_TEST") == "1")
+            {
+                var exe = Environment.ProcessPath!;
+                if (JustUpdated)
+                {
+                    log.AppendLine($"after-update: version={Island.Services.Updater.Show(Island.Services.Updater.Current)} exe={System.IO.Path.GetFileName(exe)} oldLeft={File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe)!, "Island.old.exe"))}");
+                }
+                else
+                {
+                    var up = new Island.Services.Updater();
+                    var sw0 = System.Diagnostics.Stopwatch.StartNew();
+                    bool ok = await up.CheckAsync(force: true);
+                    log.AppendLine($"check: ok={ok} ready={up.Ready} {sw0.ElapsedMilliseconds}ms");
+                    var dir2 = Path.Combine(dir, "after"); Directory.CreateDirectory(dir2);
+                    bool applied = ok && up.Apply(false, $"--snap \"{dir2}\"");
+                    log.AppendLine($"apply: {applied} oldExists={File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe)!, "Island.old.exe"))}");
+                }
+                File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString());
+                Application.Current.Shutdown();
+                return;
+            }
             if (Environment.GetEnvironmentVariable("ISLAND_SNAP_QUICK") == "1")
             {
                 if (Environment.GetEnvironmentVariable("ISLAND_SNAP_SETTINGS") == "1")
@@ -204,6 +226,94 @@ public partial class IslandWindow
                         PassTick(on); PassTick(far);
                         log.AppendLine($"pass far: passing={_passing}");
                         _passForce = false; _hoverTest = false; _s.ClickThrough = keepCt;
+                    }
+                    // смена трека во время сворачивания: плеер шлёт пачку событий — сворачивание не должно перезапускаться
+                    {
+                        Expand("home"); await Task.Delay(900);
+                        var cw = System.Diagnostics.Stopwatch.StartNew();
+                        double lastF = 0, worst = 0; int restarts = _animGen;
+                        EventHandler fh = (_, _) => { double n = cw.Elapsed.TotalMilliseconds; if (lastF > 0) worst = Math.Max(worst, n - lastF); lastF = n; };
+                        CompositionTarget.Rendering += fh;
+                        Collapse();
+                        double doneAt = -1;
+                        for (int i = 0; i < 60; i++)
+                        {
+                            if (i is 1 or 2 or 4 or 6 or 9) OnMediaChanged();
+                            await Task.Delay(20);
+                            if (doneAt < 0 && Shell.ActualHeight <= 32.5) doneAt = cw.Elapsed.TotalMilliseconds;
+                        }
+                        CompositionTarget.Rendering -= fh;
+                        log.AppendLine($"collapse+media: done={doneAt:0}ms restarts={_animGen - restarts - 1} worstFrame={worst:0.0}ms");
+                    }
+                    // загрузки + интернет
+                    {
+                        var dld = Path.Combine(dir, "dl"); Directory.CreateDirectory(dld);
+                        _dl = new DownloadWatcher(Dispatcher, dld);
+                        _dl.Changed += OnDownloadsChanged; _dl.Finished += OnDownloadFinished;
+                        var tmp = Path.Combine(dld, "ubuntu-24.04-desktop-amd64.iso.crdownload");
+                        var chunk = new byte[1 << 20];
+                        using (var f = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                        {
+                            for (int i = 0; i < 18; i++) { f.Write(chunk); f.Flush(); await Task.Delay(200); }
+                            log.AppendLine($"download: capsule={_capsuleDownload} text='{CompactText.Text}' w={_target.Width}");
+                            Snap(dir, "10_download");
+                        }
+                        File.Move(tmp, Path.Combine(dld, "ubuntu-24.04-desktop-amd64.iso"));
+                        await Task.Delay(700);
+                        log.AppendLine($"download done: toast='{_toastText}' click={_toastClick != null} capsule={_capsuleDownload}");
+                        Snap(dir, "10_download_done");
+                        _toastText = null; _toastClick = null; _dl.Dispose(); _dl = null; UpdateCompact(force: true); await Task.Delay(600);
+                        { var p1 = await NetWatcher.Ping(); var p2 = await NetWatcher.Ping(); var p3 = await NetWatcher.Ping("http://www.gstatic.com/generate_204"); var bad = await NetWatcher.Ping("http://10.255.255.1/", 1500); log.AppendLine($"ping: ya {p1}/{p2} ms, gstatic {p3} ms, недоступный адрес {bad}"); }
+                        OnNetChanged(false, TimeSpan.Zero); await Task.Delay(700); Snap(dir, "11_net_lost");
+                        OnNetChanged(true, TimeSpan.FromSeconds(83)); await Task.Delay(700); Snap(dir, "11_net_back");
+                        _toastText = null; UpdateCompact(force: true); await Task.Delay(500);
+                    }
+                    // текст песни + микрофон
+                    {
+                        InitMic(); await Task.Delay(300);
+                        Snap(dir, "9_mic_capsule");
+                        log.AppendLine($"mic: mark={MicMark.Visibility} device={_mic?.HasDevice} muted={_mic?.Muted} users=[{string.Join(", ", _mic?.Users ?? Array.Empty<string>())}] peak={_mic?.Peak:0.000}");
+                        var swl = System.Diagnostics.Stopwatch.StartNew();
+                        var lq = await LyricsService.GetAsync("Queen", "Bohemian Rhapsody", "", TimeSpan.FromSeconds(354), default);
+                        log.AppendLine($"lyrics net: {swl.ElapsedMilliseconds}ms synced={lq?.Lines.Count} plain={lq?.Plain?.Length} first='{lq?.Lines.FirstOrDefault(x => x.Text.Length > 0)?.Text}'");
+                        swl.Restart();
+                        var lq2 = await LyricsService.GetAsync("Queen", "Bohemian Rhapsody", "", TimeSpan.FromSeconds(354), default);
+                        log.AppendLine($"lyrics cached: {swl.ElapsedMilliseconds}ms same={ReferenceEquals(lq, lq2)}");
+                        var ly = await LyricsService.GetAsync("Кино", "Группа крови (Official Video)", "", TimeSpan.Zero, default);
+                        log.AppendLine($"lyrics search: synced={ly?.Lines.Count} first='{ly?.Lines.FirstOrDefault(x => x.Text.Length > 0)?.Text}'");
+                        // имитируем играющую песню и снимаем капсулу и главную с текстом
+                        var info = _media.Info;
+                        var keep = (info.Title, info.Artist, info.Album, info.IsPlaying, info.Duration, info.Position, info.PositionStamp, info.Cover);
+                        info.Title = "Bohemian Rhapsody"; info.Artist = "Queen"; info.Album = ""; info.IsPlaying = true; info.Cover = null;
+                        info.Duration = TimeSpan.FromSeconds(354); info.Position = TimeSpan.FromSeconds(62); info.PositionStamp = DateTime.UtcNow;
+                        LyricsOnMedia(); UpdateCompact(force: true);
+                        for (int i = 0; i < 40 && _lyrState == LyrState.Loading; i++) await Task.Delay(100);
+                        await Task.Delay(900);
+                        log.AppendLine($"lyrics ui: state={_lyrState} capsule={_capsuleLyrics} idx={_lyrIdx} text='{CompactText.Text}' w={_target.Width} timer={_lyrTimer?.IsEnabled}");
+                        Snap(dir, "8_lyrics_capsule");
+                        var keepOpen = _s.LyricsOpen; _s.LyricsOpen = true;
+                        Expand("home"); await Task.Delay(1200);
+                        log.AppendLine($"lyrics home: lines={LyricsList.Children.Count} shift={LyricsShift.Y:0} cur='{_lyrCur?.Text}'");
+                        Snap(dir, "8_lyrics_home");
+                        _s.LyricsOpen = keepOpen; ApplyLyricsOpen();
+                        Collapse(); await Task.Delay(700);
+                        (info.Title, info.Artist, info.Album, info.IsPlaying, info.Duration, info.Position, info.PositionStamp, info.Cover) = keep;
+                        LyricsOnMedia(); UpdateCompact(force: true); await Task.Delay(700);
+                    }
+                    // игра на весь экран + играет музыка: остров спрятан, курсор не опрашивается, хука мыши нет
+                    {
+                        await Task.Delay(800);
+                        StartIdleWatch();
+                        bool hookBefore = _volHook != null;
+                        OnFullscreenChanged(true);
+                        var pr2 = System.Diagnostics.Process.GetCurrentProcess();
+                        var c0 = pr2.TotalProcessorTime; var gw = System.Diagnostics.Stopwatch.StartNew(); int gen0 = _animGen;
+                        for (int i = 0; i < 8; i++) { OnMediaChanged(); await Task.Delay(1000); } // «смена трека» раз в секунду
+                        pr2.Refresh();
+                        log.AppendLine($"game: visible={IsVisible} idleTimer={_idleTimer.IsEnabled} hook={hookBefore}->{_volHook != null} anims={_animGen - gen0} cpu={(pr2.TotalProcessorTime - c0).TotalMilliseconds / gw.Elapsed.TotalMilliseconds / Environment.ProcessorCount * 100:F3}%");
+                        OnFullscreenChanged(false); await Task.Delay(300);
+                        log.AppendLine($"game exit: visible={IsVisible} idleTimer={_idleTimer.IsEnabled} hook={_volHook != null}");
+                        _volHook?.Dispose(); _volHook = null;
                     }
                     // спящий режим: «мышь не двигалась 20 с» → уезжает и прячется; уведомление и движение будят
                     Island.Core.Native.GetCursorPos(out _lastCursor); _lastMove = Environment.TickCount64 - SleepAfterMs - 1;

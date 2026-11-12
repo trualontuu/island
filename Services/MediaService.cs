@@ -13,7 +13,7 @@ namespace Island.Services;
 
 public sealed class MediaInfo
 {
-    public string Title = "", Artist = "", App = "";
+    public string Title = "", Artist = "", App = "", Album = "";
     public ImageSource? Cover;
     public bool IsPlaying;
     public TimeSpan Position, Duration;
@@ -245,6 +245,7 @@ public sealed class MediaService
             Info.Title = p.Title ?? "";
             Info.Artist = string.IsNullOrEmpty(p.Artist) ? p.AlbumArtist ?? "" : p.Artist;
             Info.App = AppName(s.SourceAppUserModelId);
+            Info.Album = p.AlbumTitle ?? "";
             // ключ учитывает и наличие обложки: многие плееры (Яндекс, браузеры) присылают её отдельным, вторым событием
             string key = Info.Title + "|" + Info.Artist + "|" + (p.Thumbnail != null);
             if (key != _coverKey)

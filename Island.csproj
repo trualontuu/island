@@ -11,6 +11,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>island.ico</ApplicationIcon>
     <AssemblyName>Island</AssemblyName>
+    <!-- версия для автообновления: tools/release.py поднимает её и выкладывает сборку -->
+    <Version>1.0.3</Version>
     <RootNamespace>Island</RootNamespace>
     <LangVersion>latest</LangVersion>
 

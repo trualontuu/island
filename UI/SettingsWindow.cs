@@ -40,7 +40,7 @@ public sealed class SettingsWindow : Window
     };
 
     // клавиши, запись
-    readonly TextBox _hkShelf = new(), _hkChat = new(), _hkShot = new(), _hkSystem = new(), _ffmpeg = new(), _recFps = new(), _folder = new(), _pinned = Multi();
+    readonly TextBox _hkShelf = new(), _hkChat = new(), _hkShot = new(), _hkSystem = new(), _hkMic = new(), _ffmpeg = new(), _recFps = new(), _folder = new(), _pinned = Multi();
 
     // оформление
     readonly List<RadioButton> _themeCards = new();
@@ -51,7 +51,7 @@ public sealed class SettingsWindow : Window
     static readonly int[] FpsChoices = { 0, 60, 75, 120, 144, 165, 240 };
 
     // переключатели
-    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!, _pass = null!, _passAll = null!;
+    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!, _pass = null!, _passAll = null!, _lyrics = null!, _lyrCap = null!, _micInd = null!, _autoUpd = null!, _dlCap = null!, _netAl = null!;
     readonly TextBlock _claudeState = Hint(""), _ocState = Hint("");
 
     bool _loaded, _saved;
@@ -176,6 +176,13 @@ public sealed class SettingsWindow : Window
         _mascot = Switch(face, "Маскот (глазки)", "Моргают, радуются и засыпают в капсуле");
         Line(face);
         _eq = Switch(face, "Эквалайзер при музыке", "Анимированные полоски справа в капсуле");
+        Line(face);
+        _micInd = Switch(face, "Индикатор микрофона", "Оранжевая точка, пока микрофоном кто-то пользуется; красный значок — если он выключен");
+        var lyr = Card(look, "Текст песен");
+        _lyrics = Switch(lyr, "Искать тексты песен", "Название и исполнитель отправляются в открытую базу lrclib.net. Найденное хранится на компьютере");
+        Line(lyr);
+        _lyrCap = Switch(lyr, "Строчка песни в капсуле", "Текущая строка бежит рядом с обложкой, как караоке");
+        _lyrics.Click += (_, _) => _lyrCap.IsEnabled = _lyrics.IsChecked == true;
         _pages["look"] = look;
 
         // ---------- Поведение ----------
@@ -192,9 +199,15 @@ public sealed class SettingsWindow : Window
         Line(c1);
         _hideFs = Switch(c1, "Прятать в полноэкранных играх и видео", null);
         Line(c1);
+        _dlCap = Switch(c1, "Загрузки в капсуле", "Пока браузер качает файл — имя, размер и скорость. Готово — клик по капсуле покажет файл в папке");
+        Line(c1);
+        _netAl = Switch(c1, "Сообщать, когда пропал интернет", "И когда вернулся — с тем, сколько его не было"); 
+        Line(c1);
         _volIcon = Switch(c1, "Микшер по клику на значок громкости", "Клик по значку громкости Windows открывает микшер острова (нужен перезапуск)");
         Line(c1);
         _auto = Switch(c1, "Запускать вместе с Windows", null);
+        Line(c1);
+        _autoUpd = Switch(c1, "Обновляться автоматически", $"Новая версия скачивается сама и ставится, когда ты отошёл от компьютера. Сейчас {Island.Services.Updater.Show(Island.Services.Updater.Current)}");
         var c2 = Card(beh, "Закреплённые приложения");
         c2.Children.Add(_pinned);
         c2.Children.Add(Hint("По одному пути к .exe в строке — появятся иконками на главной вкладке"));
@@ -224,6 +237,7 @@ public sealed class SettingsWindow : Window
         Field(k1, "Чат с нейросетью", _hkChat, null);
         Field(k1, "Скриншот области", _hkShot, null);
         Field(k1, "Нагрузка на ПК (вкладка «Система»)", _hkSystem, null);
+        Field(k1, "Микрофон: выключить / включить везде", _hkMic, null);
         _pages["keys"] = keys;
 
         // ---------- Запись ----------
@@ -310,11 +324,12 @@ public sealed class SettingsWindow : Window
         foreach (ComboBoxItem it in _provider.Items) if ((string)it.Tag == _s.ChatProvider) _provider.SelectedItem = it;
         if (_provider.SelectedItem == null) _provider.SelectedIndex = 0;
         _sys.Text = _s.SystemPrompt;
-        _hkShelf.Text = _s.HotkeyShelf; _hkChat.Text = _s.HotkeyChat; _hkShot.Text = _s.HotkeyScreenshot; _hkSystem.Text = _s.HotkeySystem;
+        _hkShelf.Text = _s.HotkeyShelf; _hkChat.Text = _s.HotkeyChat; _hkShot.Text = _s.HotkeyScreenshot; _hkSystem.Text = _s.HotkeySystem; _hkMic.Text = _s.HotkeyMic;
         _folder.Text = _s.CaptureFolder; _ffmpeg.Text = _s.FfmpegPath; _recFps.Text = _s.RecordFps.ToString();
         _mic.IsChecked = _s.RecordMic; _hideFs.IsChecked = _s.HideInFullscreen; _eq.IsChecked = _s.AnimateEqualizer;
         _mascot.IsChecked = _s.Mascot; _auto.IsChecked = _s.Autostart; _volIcon.IsChecked = _s.VolumeIconMixer; _sleep.IsChecked = _s.AutoSleep;
         _autoExp.IsChecked = _s.AutoExpand; _bounce.IsChecked = _s.AnimBounce;
+        _lyrics.IsChecked = _s.Lyrics; _lyrCap.IsChecked = _s.LyricsInCapsule; _lyrCap.IsEnabled = _s.Lyrics; _micInd.IsChecked = _s.MicIndicator; _autoUpd.IsChecked = _s.AutoUpdate; _dlCap.IsChecked = _s.DownloadsInCapsule; _netAl.IsChecked = _s.NetAlerts;
         _pass.IsChecked = _s.ClickThrough; _passAll.IsChecked = _s.ClickThroughAll; _passAll.IsEnabled = _s.ClickThrough;
         var th = Theme.Get(_s.Theme).Id;
         foreach (var rb in _themeCards) rb.IsChecked = (string)rb.Tag == th;
@@ -376,12 +391,13 @@ public sealed class SettingsWindow : Window
         _s.Provider = _cur.Length > 0 ? _cur : "openrouter";
         foreach (var (id, a) in _ai) _s.Ai[id] = new AiProvider { Key = a.Key.Trim(), BaseUrl = a.BaseUrl.Trim(), Model = a.Model.Trim() };
         _s.SystemPrompt = _sys.Text;
-        _s.HotkeyShelf = _hkShelf.Text.Trim(); _s.HotkeyChat = _hkChat.Text.Trim(); _s.HotkeyScreenshot = _hkShot.Text.Trim(); _s.HotkeySystem = _hkSystem.Text.Trim();
+        _s.HotkeyShelf = _hkShelf.Text.Trim(); _s.HotkeyChat = _hkChat.Text.Trim(); _s.HotkeyScreenshot = _hkShot.Text.Trim(); _s.HotkeySystem = _hkSystem.Text.Trim(); _s.HotkeyMic = _hkMic.Text.Trim();
         _s.CaptureFolder = _folder.Text.Trim(); _s.FfmpegPath = string.IsNullOrWhiteSpace(_ffmpeg.Text) ? "ffmpeg" : _ffmpeg.Text.Trim();
         if (int.TryParse(_recFps.Text, out int fps)) _s.RecordFps = Math.Clamp(fps, 10, 120);
         _s.RecordMic = _mic.IsChecked == true; _s.HideInFullscreen = _hideFs.IsChecked == true;
         _s.AnimateEqualizer = _eq.IsChecked == true; _s.Mascot = _mascot.IsChecked == true; _s.Autostart = _auto.IsChecked == true;
         _s.VolumeIconMixer = _volIcon.IsChecked == true; _s.AutoSleep = _sleep.IsChecked == true; _s.AutoExpand = _autoExp.IsChecked == true;
+        _s.Lyrics = _lyrics.IsChecked == true; _s.LyricsInCapsule = _lyrCap.IsChecked == true; _s.MicIndicator = _micInd.IsChecked == true; _s.AutoUpdate = _autoUpd.IsChecked == true; _s.DownloadsInCapsule = _dlCap.IsChecked == true; _s.NetAlerts = _netAl.IsChecked == true;
         _s.ClickThrough = _pass.IsChecked == true; _s.ClickThroughAll = _passAll.IsChecked == true;
         _s.Theme = SelectedTheme(); _s.Opacity = _opacity.Value / 100.0; _s.Fps = SelectedFps();
         _s.AnimSpeed = (int)_anim.Value; _s.AnimBounce = _bounce.IsChecked == true;

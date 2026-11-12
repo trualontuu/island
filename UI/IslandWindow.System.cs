@@ -76,12 +76,13 @@ public partial class IslandWindow
         {
             _sys = new SystemMonitor();
             _sys.BeginInit();
-            _sysTimer.Tick += (_, _) => { _sys.Sample(); _sysLast = Environment.TickCount64; RefreshSystem(); };
+            _sysTimer.Tick += (_, _) => { _sys.Sample(); _sysLast = Environment.TickCount64; PingTick(); RefreshSystem(); };
         }
         if (_sysTimer.IsEnabled) return;
         // долго не смотрели — старая история только сбивает с толку
         if (_sysLast != 0 && Environment.TickCount64 - _sysLast > 5000) { _sys.Cpu.Clear(); _sys.Ram.Clear(); _sys.Gpu.Clear(); _sys.Disk.Clear(); _sys.NetDown.Clear(); _sys.NetUp.Clear(); }
         _sys.Sample(); _sysLast = Environment.TickCount64;
+        PingTick();
         RefreshSystem();
         _sysTimer.Start();
     }
@@ -97,7 +98,8 @@ public partial class IslandWindow
         Set(_cGpu, m.GpuNow < 0 ? "—" : $"{m.GpuNow:0}%", m.GpuNow < 0 ? "нет данных" : "самый загруженный движок", m.Gpu);
         Set(_cDisk, m.DiskNow < 0 ? "—" : $"{m.DiskNow:0}%", "активность всех дисков", m.Disk);
         _cNet.Val.Text = Speed(m.DownNow);
-        _cNet.Sub.Text = $"↓ {Speed(m.DownNow)}   ↑ {Speed(m.UpNow)}";
+        var ping = _pingMs == -2 ? "" : _pingMs < 0 ? "   нет связи" : $"   пинг {_pingMs} мс";
+        _cNet.Sub.Text = $"↓ {Speed(m.DownNow)}   ↑ {Speed(m.UpNow)}{ping}";
         _cNet.G.Values = m.NetDown; _cNet.G.Values2 = m.NetUp; _cNet.G.Update();
         var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
         if (_uptime != null) _uptime.Text = up.TotalDays >= 1 ? $"{(int)up.TotalDays} д {up.Hours} ч" : up.Hours > 0 ? $"{up.Hours} ч {up.Minutes} мин" : $"{up.Minutes} мин";

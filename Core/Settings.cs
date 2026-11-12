@@ -51,6 +51,22 @@ public sealed class Settings
     /// <summary>Лёгкий пружинный отскок при раскрытии.</summary>
     public bool AnimBounce { get; set; } = true;
     public string HotkeySystem { get; set; } = "Ctrl+Alt+P";
+    /// <summary>Выключить/включить микрофон везде.</summary>
+    public string HotkeyMic { get; set; } = "Ctrl+Alt+M";
+    /// <summary>Искать тексты песен (lrclib.net).</summary>
+    public bool Lyrics { get; set; } = true;
+    /// <summary>Текущая строчка песни прямо в капсуле.</summary>
+    public bool LyricsInCapsule { get; set; } = true;
+    /// <summary>На главной вместо плиток открыт текст песни.</summary>
+    public bool LyricsOpen { get; set; } = false;
+    /// <summary>Точка в капсуле, когда микрофоном кто-то пользуется.</summary>
+    public bool MicIndicator { get; set; } = true;
+    /// <summary>Сам скачивать и ставить новые версии.</summary>
+    public bool AutoUpdate { get; set; } = true;
+    /// <summary>Загрузки браузера в капсуле.</summary>
+    public bool DownloadsInCapsule { get; set; } = true;
+    /// <summary>Уведомлять, когда пропал / вернулся интернет.</summary>
+    public bool NetAlerts { get; set; } = true;
     public int AgentPort { get; set; } = 47321;
     public int ClipboardHistory { get; set; } = 30;
 
