@@ -173,6 +173,7 @@ public partial class IslandWindow : Window
         if (!_host.RegisterHotkey(_s.HotkeyScreenshot, () => Act_Region(this, new RoutedEventArgs()))) failed.Add(_s.HotkeyScreenshot);
         if (!string.IsNullOrWhiteSpace(_s.HotkeySystem) && !_host.RegisterHotkey(_s.HotkeySystem, () => ToggleFromHotkey("system"))) failed.Add(_s.HotkeySystem);
         if (!string.IsNullOrWhiteSpace(_s.HotkeyMic) && !_host.RegisterHotkey(_s.HotkeyMic, ToggleMic)) failed.Add(_s.HotkeyMic);
+        if (!string.IsNullOrWhiteSpace(_s.HotkeyLike) && !_host.RegisterHotkey(_s.HotkeyLike, ToggleLike)) failed.Add(_s.HotkeyLike);
         if (failed.Count > 0) Dispatcher.BeginInvoke(() => Toast("Занято: " + string.Join(", ", failed), "", Mood.Alert, 4), DispatcherPriority.Background);
     }
 
@@ -757,7 +758,7 @@ public partial class IslandWindow : Window
         void Item(string h, Action a) { var i = new MenuItem { Header = h }; i.Click += (_, _) => a(); m.Items.Add(i); }
         Item("Открыть остров", () => Expand("home", true));
         Item(_userHidden ? "Показать остров" : "Скрыть остров", ToggleHidden);
-        Item("Настройки…", OpenSettings);
+        Item("Настройки…", () => OpenSettings());
         Item("Папка снимков и записей", () => ControlService.OpenUri(EnsureFolder()));
         m.Items.Add(new Separator());
         Item(_upd?.Ready is { } nv ? $"Установить версию {Updater.Show(nv)}" : $"Проверить обновления (версия {Updater.Show(Updater.Current)})", () => _ = CheckUpdate(manual: true));
@@ -818,11 +819,12 @@ public partial class IslandWindow : Window
     }
 
     SettingsWindow? _settingsWnd;
-    void OpenSettings()
+    void OpenSettings(string? page = null)
     {
         Collapse();
-        if (_settingsWnd != null) { _settingsWnd.Activate(); return; }
+        if (_settingsWnd != null) { if (page != null) _settingsWnd.ShowPage(page); _settingsWnd.Activate(); return; }
         _settingsWnd = new SettingsWindow(_s, this);
+        if (page != null) _settingsWnd.ShowPage(page);
         _settingsWnd.Closed += (_, _) => { _settingsWnd = null; Native.TrimMemory(); };
         _settingsWnd.Show();
         _settingsWnd.Activate();

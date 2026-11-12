@@ -311,6 +311,8 @@
                                     <Button x:Name="PlayBtn" Style="{StaticResource Icon}" Width="38" Height="38" FontSize="20" Content="&#xE768;" Margin="10,0" Click="Play_Click"/>
                                     <Button Style="{StaticResource Icon}" Content="&#xE893;" Click="Next_Click"/>
                                 </StackPanel>
+                                <Button x:Name="LikeBtn" Grid.Row="3" Grid.ColumnSpan="2" HorizontalAlignment="Left" Style="{StaticResource Icon}" Width="30" Height="30" FontSize="15"
+                                        Content="&#xEB51;" Visibility="Collapsed" Click="Like_Click"/>
                                 <Button x:Name="LyricsBtn" Grid.Row="3" Grid.ColumnSpan="2" HorizontalAlignment="Right" Style="{StaticResource Icon}" Width="30" Height="30" FontSize="14"
                                         Content="&#xE90B;" ToolTip="Текст песни" Click="Lyrics_Click"/>
                             </Grid>

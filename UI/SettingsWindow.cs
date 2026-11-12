@@ -22,6 +22,7 @@ public sealed class SettingsWindow : Window
     readonly IslandWindow _island;
     readonly ContentControl _page = new();
     readonly Dictionary<string, FrameworkElement> _pages = new();
+    readonly Dictionary<string, RadioButton> _nav = new();
     readonly ScrollViewer _scroll = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false };
 
     // нейросеть
@@ -40,7 +41,7 @@ public sealed class SettingsWindow : Window
     };
 
     // клавиши, запись
-    readonly TextBox _hkShelf = new(), _hkChat = new(), _hkShot = new(), _hkSystem = new(), _hkMic = new(), _ffmpeg = new(), _recFps = new(), _folder = new(), _pinned = Multi();
+    readonly TextBox _hkShelf = new(), _hkChat = new(), _hkShot = new(), _hkSystem = new(), _hkMic = new(), _hkLike = new(), _ffmpeg = new(), _recFps = new(), _folder = new(), _pinned = Multi();
 
     // оформление
     readonly List<RadioButton> _themeCards = new();
@@ -107,6 +108,7 @@ public sealed class SettingsWindow : Window
         foreach (var (id, glyph, title) in new[]
         {
             ("look", "", "Оформление"), ("behavior", "", "Поведение"), ("ai", "", "Нейросеть"),
+            ("yandex", "", "Яндекс Музыка"),
             ("keys", "", "Горячие клавиши"), ("rec", "", "Скриншоты и запись"), ("agents", "", "Агенты"),
         })
         {
@@ -116,6 +118,7 @@ public sealed class SettingsWindow : Window
                 new TextBlock { Text = title, FontSize = 13.5, VerticalAlignment = VerticalAlignment.Center } } };
             rb.Checked += (_, _) => { _page.Content = _pages[id]; _scroll.ScrollToTop(); };
             items.Children.Add(rb);
+            _nav[id] = rb;
             first ??= rb;
         }
         root.Children.Add(side);
@@ -230,6 +233,9 @@ public sealed class SettingsWindow : Window
         Field(a2, "Системная подсказка", _sys, "Как нейросеть должна себя вести");
         _pages["ai"] = ai;
 
+        // ---------- Яндекс Музыка ----------
+        BuildYandexPage();
+
         // ---------- Клавиши ----------
         var keys = Page("Горячие клавиши", "Например: Alt+Space, Ctrl+Shift+V, Win+F1. Пусто — без клавиши.");
         var k1 = Card(keys, null);
@@ -238,6 +244,7 @@ public sealed class SettingsWindow : Window
         Field(k1, "Скриншот области", _hkShot, null);
         Field(k1, "Нагрузка на ПК (вкладка «Система»)", _hkSystem, null);
         Field(k1, "Микрофон: выключить / включить везде", _hkMic, null);
+        Field(k1, "Лайк трека в Яндекс Музыке", _hkLike, null);
         _pages["keys"] = keys;
 
         // ---------- Запись ----------
@@ -324,7 +331,7 @@ public sealed class SettingsWindow : Window
         foreach (ComboBoxItem it in _provider.Items) if ((string)it.Tag == _s.ChatProvider) _provider.SelectedItem = it;
         if (_provider.SelectedItem == null) _provider.SelectedIndex = 0;
         _sys.Text = _s.SystemPrompt;
-        _hkShelf.Text = _s.HotkeyShelf; _hkChat.Text = _s.HotkeyChat; _hkShot.Text = _s.HotkeyScreenshot; _hkSystem.Text = _s.HotkeySystem; _hkMic.Text = _s.HotkeyMic;
+        _hkShelf.Text = _s.HotkeyShelf; _hkChat.Text = _s.HotkeyChat; _hkShot.Text = _s.HotkeyScreenshot; _hkSystem.Text = _s.HotkeySystem; _hkMic.Text = _s.HotkeyMic; _hkLike.Text = _s.HotkeyLike;
         _folder.Text = _s.CaptureFolder; _ffmpeg.Text = _s.FfmpegPath; _recFps.Text = _s.RecordFps.ToString();
         _mic.IsChecked = _s.RecordMic; _hideFs.IsChecked = _s.HideInFullscreen; _eq.IsChecked = _s.AnimateEqualizer;
         _mascot.IsChecked = _s.Mascot; _auto.IsChecked = _s.Autostart; _volIcon.IsChecked = _s.VolumeIconMixer; _sleep.IsChecked = _s.AutoSleep;
@@ -391,7 +398,7 @@ public sealed class SettingsWindow : Window
         _s.Provider = _cur.Length > 0 ? _cur : "openrouter";
         foreach (var (id, a) in _ai) _s.Ai[id] = new AiProvider { Key = a.Key.Trim(), BaseUrl = a.BaseUrl.Trim(), Model = a.Model.Trim() };
         _s.SystemPrompt = _sys.Text;
-        _s.HotkeyShelf = _hkShelf.Text.Trim(); _s.HotkeyChat = _hkChat.Text.Trim(); _s.HotkeyScreenshot = _hkShot.Text.Trim(); _s.HotkeySystem = _hkSystem.Text.Trim(); _s.HotkeyMic = _hkMic.Text.Trim();
+        _s.HotkeyShelf = _hkShelf.Text.Trim(); _s.HotkeyChat = _hkChat.Text.Trim(); _s.HotkeyScreenshot = _hkShot.Text.Trim(); _s.HotkeySystem = _hkSystem.Text.Trim(); _s.HotkeyMic = _hkMic.Text.Trim(); _s.HotkeyLike = _hkLike.Text.Trim();
         _s.CaptureFolder = _folder.Text.Trim(); _s.FfmpegPath = string.IsNullOrWhiteSpace(_ffmpeg.Text) ? "ffmpeg" : _ffmpeg.Text.Trim();
         if (int.TryParse(_recFps.Text, out int fps)) _s.RecordFps = Math.Clamp(fps, 10, 120);
         _s.RecordMic = _mic.IsChecked == true; _s.HideInFullscreen = _hideFs.IsChecked == true;
@@ -444,6 +451,79 @@ public sealed class SettingsWindow : Window
             using var fs = System.IO.File.Create(System.IO.Path.Combine(dir, "settings_" + id + ".png"));
             enc.Save(fs);
         }
+    }
+
+    // =====================================================================
+    //  Яндекс Музыка: вход по коду (как на телевизоре) для лайков с острова
+    // =====================================================================
+    readonly TextBlock _ymState = new() { FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+    readonly TextBlock _ymCode = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, FontFamily = new FontFamily("Cascadia Mono, Consolas"), Margin = new Thickness(0, 6, 0, 2) };
+    readonly StackPanel _ymCodeBox = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 12, 0, 0) };
+    Button _ymLogin = null!, _ymLogout = null!;
+    System.Threading.CancellationTokenSource? _ymWait;
+
+    public void ShowPage(string id) { if (_nav.TryGetValue(id, out var rb)) rb.IsChecked = true; }
+
+    void BuildYandexPage()
+    {
+        var ym = Page("Яндекс Музыка", "Сердечко у плеера на главной и Ctrl+Alt+L — лайк трека, который играет в приложении Яндекс Музыки.");
+        var y1 = Card(ym, null);
+        y1.Children.Add(_ymState);
+        _ymLogin = new Button { Style = (Style)FindResource("Primary"), Content = "Войти через Яндекс", Margin = new Thickness(0, 0, 8, 0) };
+        _ymLogin.Click += async (_, _) => await YandexLogin();
+        _ymLogout = new Button { Style = (Style)FindResource("Btn"), Content = "Выйти" };
+        _ymLogout.Click += (_, _) => { _ymWait?.Cancel(); YandexMusic.Logout(); RefreshYandex(); _island.OnYandexAccountChanged(); };
+        y1.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0), Children = { _ymLogin, _ymLogout } });
+
+        var open = new Button { Style = (Style)FindResource("Btn"), Content = "Открыть ya.ru/device", Margin = new Thickness(0, 0, 8, 0) };
+        open.Click += (_, _) => ControlService.OpenUri("https://ya.ru/device");
+        var copy = new Button { Style = (Style)FindResource("Btn"), Content = "Скопировать код" };
+        copy.Click += (_, _) => { try { Clipboard.SetText(_ymCode.Text); } catch { } };
+        _ymCodeBox.Children.Add(Hint("Открой ya.ru/device (можно с телефона), войди в свой аккаунт и введи код:"));
+        _ymCodeBox.Children.Add(_ymCode);
+        _ymCodeBox.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0), Children = { open, copy } });
+        y1.Children.Add(_ymCodeBox);
+
+        var y2 = Card(ym, "Что хранится");
+        y2.Children.Add(Hint("Пароль остров не видит — вход подтверждаешь на сайте Яндекса. Остров получает только токен доступа к Музыке; он лежит в папке настроек " +
+            "в зашифрованном виде (открыть может только твоя учётная запись Windows) и отправляется только на api.music.yandex.net. " +
+            "Выйти можно здесь или в аккаунте Яндекса: id.yandex.ru → Устройства и сервисы."));
+        y2.Children.Add(Hint("\nЛайк ставится тому треку, который нашёлся в каталоге по названию и исполнителю — для редких перезаливов может не найтись."));
+        _pages["yandex"] = ym;
+        RefreshYandex();
+        Closed += (_, _) => _ymWait?.Cancel();
+    }
+
+    void RefreshYandex()
+    {
+        bool on = YandexMusic.LoggedIn;
+        _ymState.Text = on ? "Вход выполнен" + (YandexMusic.Login.Length > 0 ? ": " + YandexMusic.Login : "") : "Не выполнен вход";
+        _ymLogin.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+        _ymLogout.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (on) _ymCodeBox.Visibility = Visibility.Collapsed;
+    }
+
+    async System.Threading.Tasks.Task YandexLogin()
+    {
+        _ymWait?.Cancel();
+        var cts = _ymWait = new System.Threading.CancellationTokenSource();
+        _ymLogin.IsEnabled = false;
+        try
+        {
+            var dc = await YandexMusic.StartLogin();
+            _ymCode.Text = dc.UserCode;
+            _ymCodeBox.Visibility = Visibility.Visible;
+            _ymState.Text = "Жду подтверждения на ya.ru/device…";
+            ControlService.OpenUri(dc.Url);
+            bool ok = await YandexMusic.WaitLogin(dc, cts.Token);
+            _ymCodeBox.Visibility = Visibility.Collapsed;
+            RefreshYandex();
+            if (!ok) _ymState.Text = "Код не подтвердили вовремя — нажми «Войти» ещё раз";
+            else _island.OnYandexAccountChanged();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _ymCodeBox.Visibility = Visibility.Collapsed; _ymState.Text = "Не получилось связаться с Яндексом: " + ex.Message; }
+        finally { if (_ymWait == cts) _ymLogin.IsEnabled = true; }
     }
 
     // =====================================================================

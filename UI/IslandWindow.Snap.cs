@@ -19,6 +19,40 @@ public partial class IslandWindow
         var log = new StringBuilder();
         try
         {
+            // лайки Яндекс Музыки на подставном сервере (ISLAND_YM_API/ISLAND_YM_OAUTH → mock_ym.py), настоящий аккаунт не трогаем
+            if (Environment.GetEnvironmentVariable("ISLAND_YM_TEST") == "1")
+            {
+                YandexMusic.Logout();
+                log.AppendLine($"before: loggedIn={YandexMusic.LoggedIn}");
+                var dc = await YandexMusic.StartLogin();
+                log.AppendLine($"code: {dc.UserCode} url={dc.Url}");
+                bool ok = await YandexMusic.WaitLogin(dc, default);
+                log.AppendLine($"login: ok={ok} uid={YandexMusic.Uid} login={YandexMusic.Login}");
+                await Task.Delay(500);
+                var m = new MediaInfo { Title = "Группа крови", Artist = "Кино", AppId = "ru.yandex.desktop.music", Duration = TimeSpan.FromSeconds(286) };
+                var t = await YandexMusic.Resolve(m);
+                log.AppendLine($"resolve: {t} liked={t != null && YandexMusic.IsLiked(t)}");
+                var miss = await YandexMusic.Resolve(new MediaInfo { Title = "Нет такой", Artist = "Никто" });
+                log.AppendLine($"resolve-miss: {miss ?? "null"}");
+                if (t != null)
+                {
+                    log.AppendLine($"like: {await YandexMusic.SetLike(t, true)} liked={YandexMusic.IsLiked(t)}");
+                    // подменяем трек в плеере и рисуем главную с красным сердечком
+                    _media.Info.Title = m.Title; _media.Info.Artist = m.Artist; _media.Info.AppId = m.AppId; _media.Info.App = "Яндекс"; _media.Info.Duration = m.Duration;
+                    Expand("home"); RefreshMedia(); await Task.Delay(1200); Snap(dir, "ym_liked");
+                    log.AppendLine($"unlike: {!await YandexMusic.SetLike(t, false)} liked={YandexMusic.IsLiked(t)}");
+                    _likeFor = ""; RefreshMedia(); await Task.Delay(700); Snap(dir, "ym_unliked");
+                }
+                // токен на диске: зашифрован, сам токен в файле не виден
+                var file = Path.Combine(Island.Core.Settings.Dir, Environment.GetEnvironmentVariable("ISLAND_YM_TOKENFILE") ?? "yandex.bin");
+                log.AppendLine($"tokenfile: exists={File.Exists(file)} plain={File.Exists(file) && Encoding.UTF8.GetString(File.ReadAllBytes(file)).Contains("MOCKTOKEN")}");
+                YandexMusic.Logout();
+                log.AppendLine($"logout: loggedIn={YandexMusic.LoggedIn} fileLeft={File.Exists(file)}");
+                File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString());
+                Application.Current.Shutdown();
+                return;
+            }
+
             // автообновление: скачать последнюю сборку (даже той же версии), подменить свой exe и запустить новую копию
             if (Environment.GetEnvironmentVariable("ISLAND_UPD_TEST") == "1")
             {

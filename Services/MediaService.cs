@@ -14,6 +14,8 @@ namespace Island.Services;
 public sealed class MediaInfo
 {
     public string Title = "", Artist = "", App = "", Album = "";
+    /// <summary>Идентификатор плеера в Windows (SourceAppUserModelId), например ru.yandex.desktop.music.</summary>
+    public string AppId = "";
     public ImageSource? Cover;
     public bool IsPlaying;
     public TimeSpan Position, Duration;
@@ -245,6 +247,7 @@ public sealed class MediaService
             Info.Title = p.Title ?? "";
             Info.Artist = string.IsNullOrEmpty(p.Artist) ? p.AlbumArtist ?? "" : p.Artist;
             Info.App = AppName(s.SourceAppUserModelId);
+            Info.AppId = s.SourceAppUserModelId ?? "";
             Info.Album = p.AlbumTitle ?? "";
             // ключ учитывает и наличие обложки: многие плееры (Яндекс, браузеры) присылают её отдельным, вторым событием
             string key = Info.Title + "|" + Info.Artist + "|" + (p.Thumbnail != null);

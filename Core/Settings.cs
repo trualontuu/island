@@ -53,6 +53,8 @@ public sealed class Settings
     public string HotkeySystem { get; set; } = "Ctrl+Alt+P";
     /// <summary>Выключить/включить микрофон везде.</summary>
     public string HotkeyMic { get; set; } = "Ctrl+Alt+M";
+    /// <summary>Лайк текущего трека в Яндекс Музыке.</summary>
+    public string HotkeyLike { get; set; } = "Ctrl+Alt+L";
     /// <summary>Искать тексты песен (lrclib.net).</summary>
     public bool Lyrics { get; set; } = true;
     /// <summary>Текущая строчка песни прямо в капсуле.</summary>
