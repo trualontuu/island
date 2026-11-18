@@ -76,7 +76,12 @@ public partial class IslandWindow : Window
             Collapse();
         };
         _tick.Tick += (_, _) => OnTick();
-        _toastTimer.Tick += (_, _) => { _toastTimer.Stop(); _toastText = null; _toastClick = null; UpdateCompact(); };
+        _toastTimer.Tick += (_, _) =>
+        {
+            // курсор на карточке Telegram — читаешь, не убираем
+            if (_toastTg != null && Shell.IsMouseOver && !_expanded) { _toastTimer.Interval = TimeSpan.FromSeconds(1.5); return; }
+            _toastTimer.Stop(); _toastText = null; _toastClick = null; _toastTg = null; _tgBurst = 0; UpdateCompact();
+        };
         _agentDoneTimer.Tick += (_, _) => { _agentDoneTimer.Stop(); _agent?.Dismiss(); };
         _trimTimer.Tick += (_, _) => { _trimTimer.Stop(); if (!_expanded) Native.TrimMemory(); };
 
@@ -153,6 +158,7 @@ public partial class IslandWindow : Window
         LyricsOnMedia();
         InitUpdater();
         InitNet();
+        InitTelegram();
 
         if (StartHidden || _hideRequested) { _hideRequested = false; HideIsland(); return; }
         ShowUpdatedToast();
@@ -262,7 +268,7 @@ public partial class IslandWindow : Window
             dur = Theme.Ms(grow ? 600 : 560);
         }
 
-        double r = expanded ? 32 : Math.Min(16, target.Height / 2);
+        double r = expanded ? 32 : target.Height > 40 ? 30 : Math.Min(16, target.Height / 2); // > 40 — карточка Telegram
         int gen = ++_animGen;
         _animUntil = Environment.TickCount64 + (long)dur.TotalMilliseconds + 80;
         void Go()
@@ -373,6 +379,7 @@ public partial class IslandWindow : Window
 
         if (!wasExpanded)
         {
+            TgBanner.Visibility = Visibility.Collapsed;
             Fade(Compact, 0, 110, () => Compact.Visibility = Visibility.Collapsed);
             Expanded.Visibility = Visibility.Visible;
             Fade(Expanded, 1, 220, null);
@@ -488,9 +495,16 @@ public partial class IslandWindow : Window
         _capsuleLyrics = false; _capsuleDownload = false;
         CompactText.BeginAnimation(OpacityProperty, null); CompactText.Opacity = 1;
         CompactText.Visibility = Visibility.Visible;
+        CompactText.HorizontalAlignment = HorizontalAlignment.Center;
 
         var a = _agent;
-        if (_toastText != null)
+        bool banner = false;
+        if (_toastText != null && _toastTg != null)
+        {
+            FillTgBanner();
+            banner = true;
+        }
+        else if (_toastText != null)
         {
             if (_toastGlyph != null) { CompactGlyph.Text = _toastGlyph; CompactGlyph.Visibility = Visibility.Visible; }
             else ShowMascot();
@@ -569,7 +583,14 @@ public partial class IslandWindow : Window
 
         UpdateMicMark();
         LyricsTick();
+        if (!_expanded)
+        {
+            // сообщение Telegram — отдельная крупная карточка вместо строки капсулы
+            TgBanner.Visibility = banner ? Visibility.Visible : Visibility.Collapsed;
+            Compact.Visibility = banner ? Visibility.Collapsed : Visibility.Visible;
+        }
         if (_expanded && !force) return;
+        if (banner) { if (!_hiddenByFullscreen) AnimateTo(TgBannerSize, false); return; }
         CompactText.MaxWidth = 300;
         Compact.Measure(new Size(double.PositiveInfinity, 32));
         double w = idle ? 84 : fixedW ? minW : Math.Max(minW, Compact.DesiredSize.Width + 22);
@@ -597,10 +618,11 @@ public partial class IslandWindow : Window
         return true;
     }
 
-    public void Toast(string text, string? glyph = null, Mood mood = Mood.Happy, double seconds = 2.5)
+    public void Toast(string text, string? glyph = null, Mood mood = Mood.Happy, double seconds = 2.5, TgMessage? tg = null, int tgBurst = 0)
     {
         _toastText = text; _toastGlyph = glyph; _toastMood = mood;
         _toastClick = null; // действие по клику — только у того уведомления, которое его задало (после вызова Toast)
+        _toastTg = tg; _tgBurst = tgBurst;
         _toastTimer.Stop();
         _toastTimer.Interval = TimeSpan.FromSeconds(seconds);
         _toastTimer.Start();
@@ -664,12 +686,14 @@ public partial class IslandWindow : Window
             _hiddenByFullscreen = true;
             SetEq(false);
             _idleTimer.Stop(); // в игре курсор не опрашиваем совсем
+            _tg?.Pause(true);  // и уведомления Telegram тоже — пропущенные покажем после игры
             Hide();
         }
         else if (!fs && _hiddenByFullscreen)
         {
             _hiddenByFullscreen = false;
             StartIdleWatch();
+            _tg?.Pause(false);
             if (_asleep) return; // спит — покажется при движении мыши
             Show();
             PlaceWindow(_target);
@@ -795,6 +819,7 @@ public partial class IslandWindow : Window
         _volHook?.Dispose(); _volHook = null;         // перехват мыши у значка громкости
         if (_fs != null) { _fs.Changed -= OnFullscreenChanged; _fs.Dispose(); _fs = null; } // слежка за окнами
         _host.ClearHotkeys();
+        _tg?.Pause(true);
         Hide();
         _trimTimer.Stop();
         Native.TrimMemory();
@@ -816,6 +841,7 @@ public partial class IslandWindow : Window
         UpdateCompact(force: true);
         UpdateTimers();
         StartIdleWatch();
+        _tg?.Pause(false);
     }
 
     SettingsWindow? _settingsWnd;
@@ -837,7 +863,7 @@ public partial class IslandWindow : Window
         RegisterHotkeys();
         MascotSmall.Visibility = _s.Mascot ? Visibility.Visible : Visibility.Collapsed;
         _pinnedLoaded = false;
-        if (_loadedDone) { LyricsOnMedia(); RebuildLyricsView(); UpdateMicButton(); InitNet(); }
+        if (_loadedDone) { LyricsOnMedia(); RebuildLyricsView(); UpdateMicButton(); InitNet(); InitTelegram(); }
         UpdateCompact(force: true);
         if (_loadedDone && !_userHidden) StartIdleWatch();
     }
@@ -869,7 +895,7 @@ public partial class IslandWindow : Window
         _fs?.Dispose();
         _volHook?.Dispose();
         _mic?.Dispose();
-        _dl?.Dispose(); _net?.Dispose();
+        _dl?.Dispose(); _net?.Dispose(); _tg?.Dispose();
         _mixer.Dispose();
         _ctl.Dispose();
         base.OnClosed(e);

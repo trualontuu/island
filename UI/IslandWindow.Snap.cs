@@ -22,6 +22,14 @@ public partial class IslandWindow
             // лайки Яндекс Музыки на подставном сервере (ISLAND_YM_API/ISLAND_YM_OAUTH → mock_ym.py), настоящий аккаунт не трогаем
             if (Environment.GetEnvironmentVariable("ISLAND_YM_TEST") == "1")
             {
+                // откуда играет: приложение, версия из Store, сайт в браузере (окно с заголовком вкладки), чужой сайт
+                bool Src(string app, string title) => YandexMusic.IsYandexSource(new MediaInfo { AppId = app, Title = title });
+                var tab = new Window { Title = "Видели ночь — Кино • Яндекс Музыка — Google Chrome", Left = -9000, Top = -3000, Width = 50, Height = 50, ShowActivated = false, ShowInTaskbar = false };
+                tab.Show(); await Task.Delay(200);
+                log.AppendLine($"src: desktop={Src("ru.yandex.desktop.music", "x")} store={Src("A025C540.Yandex.Music_vfvw9svesycw6!App", "x")} " +
+                               $"chromeTab={Src("chrome", "Видели ночь")} chromeOther={Src("chrome", "Кукушка")} spotify={Src("Spotify.exe", "Видели ночь2")}");
+                tab.Close();
+
                 YandexMusic.Logout();
                 log.AppendLine($"before: loggedIn={YandexMusic.LoggedIn}");
                 var dc = await YandexMusic.StartLogin();
@@ -71,6 +79,87 @@ public partial class IslandWindow
                     bool applied = ok && up.Apply(false, $"--snap \"{dir2}\"");
                     log.AppendLine($"apply: {applied} oldExists={File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe)!, "Island.old.exe"))}");
                 }
+                File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString());
+                Application.Current.Shutdown();
+                return;
+            }
+            // уведомления Telegram: вместо Telegram «слушаем» PowerShell и шлём от его имени тестовые уведомления
+            if (Environment.GetEnvironmentVariable("ISLAND_TG_TEST") == "1")
+            {
+                const string aumid = @"{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe";
+                async Task Post(string tag, string? img, params string[] lines)
+                {
+                    // как у Telegram: аватарка — appLogoOverride с file:///…png
+                    var texts = (img != null ? $"<image placement=\"appLogoOverride\" hint-crop=\"circle\" src=\"file:///{img}\"/>" : "") +
+                                string.Concat(lines.Select(l => "<text>" + System.Security.SecurityElement.Escape(l) + "</text>"));
+                    var ps = "$null=[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime];" +
+                             "$null=[Windows.Data.Xml.Dom.XmlDocument,Windows.Data.Xml.Dom,ContentType=WindowsRuntime];" +
+                             "$x=New-Object Windows.Data.Xml.Dom.XmlDocument;$x.LoadXml('<toast><visual><binding template=\"ToastGeneric\">" + texts.Replace("'", "''") + "</binding></visual><audio silent=\"true\"/></toast>');" +
+                             $"$t=[Windows.UI.Notifications.ToastNotification]::new($x);$t.Tag='{tag}';$t.Group='isltg';$t.SuppressPopup=$true;" +
+                             $"[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{aumid}').Show($t)";
+                    var psi = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
+                    psi.ArgumentList.Add("-NoProfile"); psi.ArgumentList.Add("-Command"); psi.ArgumentList.Add(ps);
+                    using var p = System.Diagnostics.Process.Start(psi)!; await p.WaitForExitAsync();
+                }
+                string Mem() { GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect(); var p = System.Diagnostics.Process.GetCurrentProcess(); return $"{p.PrivateMemorySize64 >> 20} МБ, emoji-сборки: [{string.Join(", ", AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name).Where(n => n!.StartsWith("Emoji") || n.StartsWith("Typography")))}]"; }
+                log.AppendLine("start: " + Mem());
+                _tg = new TelegramWatcher(Dispatcher) { Keys = new[] { "powershell" }, ForceListener = Environment.GetEnvironmentVariable("ISLAND_TG_LISTENER") == "1" };
+                var got = new System.Collections.Generic.List<TgMessage>();
+                var arrived = System.Diagnostics.Stopwatch.StartNew();
+                double firstMs = -1;
+                _tg.Message += m => { if (firstMs < 0) firstMs = arrived.Elapsed.TotalMilliseconds; got.Add(m); OnTgMessage(m); };
+                _tg.Missed += OnTgMissed;
+                await _tg.StartAsync();
+                log.AppendLine("after listener start: " + Mem());
+                log.AppendLine($"tg: status='{_tg.Status}' baselinePoll={_tg.LastScanMs:0.0}ms");
+                await Task.Delay(300);
+                Snap(dir, "tg_0_idle");
+                log.AppendLine("after snap0: " + Mem());
+                { var e0 = System.Diagnostics.Process.GetCurrentProcess(); e0.Refresh(); long m0 = e0.PrivateMemorySize64; var tb = new System.Windows.Controls.TextBlock { FontSize = 13 }; EmojiText.Set(tb, "тест 😅💐🙏🎮"); GC.Collect(); e0.Refresh(); log.AppendLine($"emoji load: +{(e0.PrivateMemorySize64 - m0) >> 20} МБ"); }
+                arrived.Restart();
+                var ava = Path.Combine(dir, "ava.png");
+                File.Copy(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "docs", "img", "icon.png"), ava, true);
+                await Post("t1", ava, "Маша 💐", "Ты придёшь сегодня на пару? 😅 Там вроде контрольная по матану");
+                for (int i = 0; i < 40 && got.Count < 1; i++) await Task.Delay(100);
+                await Task.Delay(700);
+                log.AppendLine($"tg1: got={got.Count} after={firstMs:0}ms title='{got.FirstOrDefault()?.Title}' avatar={got.FirstOrDefault()?.Avatar != null} text='{got.FirstOrDefault()?.Text}' click={_toastClick != null} w={_target.Width} poll={_tg.LastScanMs:0.0}ms");
+                log.AppendLine("msg1 before snap: " + Mem());
+                Snap(dir, "tg_1_private");
+                log.AppendLine("after msg1: " + Mem());
+                await Post("t2", null, "ПетрГУ ИВТ 2 курс", "Артём", "Скиньте расписание на завтра 🙏");
+                for (int i = 0; i < 40 && got.Count < 2; i++) await Task.Delay(100);
+                await Task.Delay(700);
+                log.AppendLine($"tg2: got={got.Count} title='{got.LastOrDefault()?.Title}' text='{got.LastOrDefault()?.Text}' burst={_tgBurst} w={_target.Width}");
+                Snap(dir, "tg_2_group_burst");
+                _s.TelegramShowText = false; UpdateCompact(force: true); await Task.Delay(700);
+                Snap(dir, "tg_3_hidden_text"); _s.TelegramShowText = true;
+                // пауза (игра) → два сообщения → возврат: одно уведомление «2 новых сообщения»
+                _toastText = null; _toastTg = null; UpdateCompact(force: true); await Task.Delay(500);
+                _tg.Pause(true);
+                await Post("t3", null, "🎮 Пати", "Дима", "го катку"); await Post("t4", null, "Мама", "Позвони, как освободишься");
+                await Task.Delay(800);
+                int before = got.Count;
+                _tg.Pause(false); await Task.Delay(1200);
+                log.AppendLine($"tg pause: newWhilePaused={got.Count - before} toast='{_toastText}'");
+                Snap(dir, "tg_4_missed");
+                // цена опроса
+                var swp = System.Diagnostics.Stopwatch.StartNew(); var cpu0 = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
+                for (int i = 0; i < 20; i++) { await Windows.UI.Notifications.Management.UserNotificationListener.Current.GetNotificationsAsync(Windows.UI.Notifications.NotificationKinds.Toast); }
+                var cpu1 = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime;
+                log.AppendLine($"listener scan cost: {swp.Elapsed.TotalMilliseconds / 20:0.0}ms wall, {(cpu1 - cpu0).TotalMilliseconds / 20:0.00}ms cpu per call");
+                { var mx = WpnDb.MaxId() ?? 0; var c0 = System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime; var sw3 = System.Diagnostics.Stopwatch.StartNew();
+                  int rows = 0; for (int i = 0; i < 50; i++) { _ = WpnDb.MaxId(); rows = WpnDb.ToastsAfter(mx - 5)!.Count; }
+                  log.AppendLine($"db scan cost: {sw3.Elapsed.TotalMilliseconds / 50:0.00}ms wall, {(System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime - c0).TotalMilliseconds / 50:0.00}ms cpu per call (rows={rows})"); }
+                foreach (var tag in new[] { "t1", "t2", "t3", "t4" }) Windows.UI.Notifications.ToastNotificationManager.History.Remove(tag, "isltg", aumid);
+                {
+                    var wal = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Windows", "Notifications", "wpndatabase.db-wal");
+                    var sws = System.Diagnostics.Stopwatch.StartNew();
+                    for (int i = 0; i < 2000; i++) { var fi = new FileInfo(wal); _ = fi.Length; _ = fi.LastWriteTimeUtc; }
+                    log.AppendLine($"stamp cost: {sws.Elapsed.TotalMilliseconds / 2000 * 1000:0}us per check");
+                    await Task.Delay(2500); int sc0 = _tg.Scans; await Task.Delay(8000);
+                    log.AppendLine($"idle 8s: full scans={_tg.Scans - sc0}");
+                }
+                _tg.Dispose(); _tg = null;
                 File.WriteAllText(Path.Combine(dir, "log.txt"), log.ToString());
                 Application.Current.Shutdown();
                 return;

@@ -17,7 +17,8 @@ public partial class IslandWindow
     bool _likeBusy;
     static readonly SolidColorBrush LikeRed = new(Color.FromRgb(255, 69, 88));
 
-    bool LikeAvailable => _media.Info.HasMedia && YandexMusic.IsYandexSource(_media.Info);
+    bool IsNoir => _media.Info.HasMedia && NoirLink.IsNoir(_media.Info.AppId);
+    bool LikeAvailable => _media.Info.HasMedia && (IsNoir || YandexMusic.IsYandexSource(_media.Info));
 
     /// <summary>Сменился трек — узнаём его в каталоге и лайкнут ли он. Сеть — только если открыта главная или нажали лайк.</summary>
     async Task<string?> ResolveLike()
@@ -40,6 +41,15 @@ public partial class IslandWindow
     async void UpdateLikeButton()
     {
         if (!LikeAvailable) { LikeBtn.Visibility = Visibility.Collapsed; return; }
+        if (IsNoir)
+        {
+            // свой плеер Noir: он сам знает трек и лайк — спрашиваем по каналу, без поиска по каталогу
+            var st = await NoirLink.State();
+            if (!IsNoir) return;
+            LikeBtn.Visibility = st is { Sc: false } ? Visibility.Visible : Visibility.Collapsed;
+            if (st != null) ShowLike(st.Liked);
+            return;
+        }
         LikeBtn.Visibility = Visibility.Visible;
         var key = _media.Info.Title + "|" + _media.Info.Artist;
         if (key != _likeFor) { _likeTrack = null; ShowLike(false); }
@@ -63,6 +73,7 @@ public partial class IslandWindow
     async void ToggleLike()
     {
         if (!LikeAvailable) { Toast("Лайк — только для Яндекс Музыки", "", Mood.Alert, 2); return; }
+        if (IsNoir) { await ToggleNoirLike(); return; }
         if (!YandexMusic.LoggedIn) { Toast("Войди в Яндекс в настройках", "", Mood.Alert, 2.5); OpenSettings("yandex"); return; }
         if (_likeBusy) return;
         _likeBusy = true;
@@ -77,6 +88,23 @@ public partial class IslandWindow
         }
         catch (UnauthorizedAccessException) { YandexMusic.Logout(); Toast("Яндекс просит войти заново", "", Mood.Alert, 3); ShowLike(false); }
         catch { Toast("Не получилось — нет связи с Яндексом", "", Mood.Alert, 2.5); }
+        finally { _likeBusy = false; }
+    }
+
+    async Task ToggleNoirLike()
+    {
+        if (_likeBusy) return;
+        _likeBusy = true;
+        try
+        {
+            var before = await NoirLink.State();
+            if (before == null) { Toast("Noir не отвечает", "", Mood.Alert, 2); return; }
+            if (before.Sc) { Toast("У SoundCloud нет лайков", "", Mood.Alert, 2); return; }
+            var st = await NoirLink.Like();
+            if (st == null || st.Liked == before.Liked) { Toast("Не получилось — нет связи с Яндексом", "", Mood.Alert, 2.5); return; }
+            Toast(st.Liked ? "Добавлено в «Мне нравится»" : "Убрано из «Мне нравится»", st.Liked ? "" : "", st.Liked ? Mood.Happy : Mood.Alert, 1.8);
+            ShowLike(st.Liked);
+        }
         finally { _likeBusy = false; }
     }
 

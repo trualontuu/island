@@ -44,6 +44,7 @@ public partial class IslandWindow
         MediaArtist.Text = i.HasMedia ? i.Artist : "Включи музыку — остров оживёт";
         MediaApp.Text = i.App;
         MediaAppBadge.Visibility = i.HasMedia && i.App.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        MediaAppBadge.ToolTip = i.AppId.Length > 0 ? "Источник в Windows: " + i.AppId : null;
         UpdateLikeButton();
         CoverBigBrush.ImageSource = i.Cover;
         if (!ReferenceEquals(_glowFor, i.Cover)) SetGlow(i.Cover, i.Cover == null ? null : MakeGlow(i.Cover));

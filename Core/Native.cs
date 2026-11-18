@@ -7,6 +7,15 @@ namespace Island.Core;
 public static class Native
 {
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern int GetCurrentThreadId();
+
+    // ---- простой: сколько времени не трогали клавиатуру и мышь ----
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct LastInput { public int Size; public uint Time; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LastInput li);
+    public static TimeSpan IdleTime()
+    {
+        var li = new LastInput { Size = 8 };
+        return GetLastInputInfo(ref li) ? TimeSpan.FromMilliseconds((uint)Environment.TickCount - li.Time) : TimeSpan.Zero;
+    }
     // ---- окна ----
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_TOOLWINDOW = 0x80;

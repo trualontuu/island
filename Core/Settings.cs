@@ -69,6 +69,12 @@ public sealed class Settings
     public bool DownloadsInCapsule { get; set; } = true;
     /// <summary>Уведомлять, когда пропал / вернулся интернет.</summary>
     public bool NetAlerts { get; set; } = true;
+    /// <summary>Сообщения Telegram в капсуле (из уведомлений Windows).</summary>
+    public bool TelegramInCapsule { get; set; } = true;
+    /// <summary>Показывать текст сообщения, а не только от кого.</summary>
+    public bool TelegramShowText { get; set; } = true;
+    /// <summary>Фото профиля отправителя (из уведомления Telegram) вместо кружка с буквой.</summary>
+    public bool TelegramAvatars { get; set; } = true;
     public int AgentPort { get; set; } = 47321;
     public int ClipboardHistory { get; set; } = 30;
 

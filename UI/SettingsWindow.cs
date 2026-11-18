@@ -52,7 +52,7 @@ public sealed class SettingsWindow : Window
     static readonly int[] FpsChoices = { 0, 60, 75, 120, 144, 165, 240 };
 
     // переключатели
-    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!, _pass = null!, _passAll = null!, _lyrics = null!, _lyrCap = null!, _micInd = null!, _autoUpd = null!, _dlCap = null!, _netAl = null!;
+    CheckBox _mic = null!, _hideFs = null!, _eq = null!, _mascot = null!, _auto = null!, _volIcon = null!, _sleep = null!, _autoExp = null!, _bounce = null!, _pass = null!, _passAll = null!, _lyrics = null!, _lyrCap = null!, _micInd = null!, _autoUpd = null!, _dlCap = null!, _netAl = null!, _tgCap = null!, _tgText = null!, _tgAva = null!;
     readonly TextBlock _claudeState = Hint(""), _ocState = Hint("");
 
     bool _loaded, _saved;
@@ -206,6 +206,13 @@ public sealed class SettingsWindow : Window
         Line(c1);
         _netAl = Switch(c1, "Сообщать, когда пропал интернет", "И когда вернулся — с тем, сколько его не было"); 
         Line(c1);
+        _tgCap = Switch(c1, "Сообщения Telegram в капсуле", "Кто написал и что — из уведомлений Windows, вход в аккаунт не нужен. Клик по капсуле открывает Telegram. После игры на весь экран — сколько пришло");
+        _tgText = Switch(c1, "Показывать текст сообщения", "Выключи — будет только имя и «новое сообщение»");
+        _tgText.Margin = new Thickness(22, 0, 0, 0);
+        _tgAva = Switch(c1, "Фото профиля", "Аватарка отправителя из уведомления Telegram. Выключи — будет цветной кружок с буквой");
+        _tgAva.Margin = new Thickness(22, 0, 0, 0);
+        _tgCap.Click += (_, _) => _tgText.IsEnabled = _tgAva.IsEnabled = _tgCap.IsChecked == true;
+        Line(c1);
         _volIcon = Switch(c1, "Микшер по клику на значок громкости", "Клик по значку громкости Windows открывает микшер острова (нужен перезапуск)");
         Line(c1);
         _auto = Switch(c1, "Запускать вместе с Windows", null);
@@ -336,7 +343,7 @@ public sealed class SettingsWindow : Window
         _mic.IsChecked = _s.RecordMic; _hideFs.IsChecked = _s.HideInFullscreen; _eq.IsChecked = _s.AnimateEqualizer;
         _mascot.IsChecked = _s.Mascot; _auto.IsChecked = _s.Autostart; _volIcon.IsChecked = _s.VolumeIconMixer; _sleep.IsChecked = _s.AutoSleep;
         _autoExp.IsChecked = _s.AutoExpand; _bounce.IsChecked = _s.AnimBounce;
-        _lyrics.IsChecked = _s.Lyrics; _lyrCap.IsChecked = _s.LyricsInCapsule; _lyrCap.IsEnabled = _s.Lyrics; _micInd.IsChecked = _s.MicIndicator; _autoUpd.IsChecked = _s.AutoUpdate; _dlCap.IsChecked = _s.DownloadsInCapsule; _netAl.IsChecked = _s.NetAlerts;
+        _lyrics.IsChecked = _s.Lyrics; _lyrCap.IsChecked = _s.LyricsInCapsule; _lyrCap.IsEnabled = _s.Lyrics; _micInd.IsChecked = _s.MicIndicator; _autoUpd.IsChecked = _s.AutoUpdate; _dlCap.IsChecked = _s.DownloadsInCapsule; _netAl.IsChecked = _s.NetAlerts; _tgCap.IsChecked = _s.TelegramInCapsule; _tgText.IsChecked = _s.TelegramShowText; _tgText.IsEnabled = _s.TelegramInCapsule; _tgAva.IsChecked = _s.TelegramAvatars; _tgAva.IsEnabled = _s.TelegramInCapsule;
         _pass.IsChecked = _s.ClickThrough; _passAll.IsChecked = _s.ClickThroughAll; _passAll.IsEnabled = _s.ClickThrough;
         var th = Theme.Get(_s.Theme).Id;
         foreach (var rb in _themeCards) rb.IsChecked = (string)rb.Tag == th;
@@ -404,7 +411,7 @@ public sealed class SettingsWindow : Window
         _s.RecordMic = _mic.IsChecked == true; _s.HideInFullscreen = _hideFs.IsChecked == true;
         _s.AnimateEqualizer = _eq.IsChecked == true; _s.Mascot = _mascot.IsChecked == true; _s.Autostart = _auto.IsChecked == true;
         _s.VolumeIconMixer = _volIcon.IsChecked == true; _s.AutoSleep = _sleep.IsChecked == true; _s.AutoExpand = _autoExp.IsChecked == true;
-        _s.Lyrics = _lyrics.IsChecked == true; _s.LyricsInCapsule = _lyrCap.IsChecked == true; _s.MicIndicator = _micInd.IsChecked == true; _s.AutoUpdate = _autoUpd.IsChecked == true; _s.DownloadsInCapsule = _dlCap.IsChecked == true; _s.NetAlerts = _netAl.IsChecked == true;
+        _s.Lyrics = _lyrics.IsChecked == true; _s.LyricsInCapsule = _lyrCap.IsChecked == true; _s.MicIndicator = _micInd.IsChecked == true; _s.AutoUpdate = _autoUpd.IsChecked == true; _s.DownloadsInCapsule = _dlCap.IsChecked == true; _s.NetAlerts = _netAl.IsChecked == true; _s.TelegramInCapsule = _tgCap.IsChecked == true; _s.TelegramShowText = _tgText.IsChecked == true; _s.TelegramAvatars = _tgAva.IsChecked == true;
         _s.ClickThrough = _pass.IsChecked == true; _s.ClickThroughAll = _passAll.IsChecked == true;
         _s.Theme = SelectedTheme(); _s.Opacity = _opacity.Value / 100.0; _s.Fps = SelectedFps();
         _s.AnimSpeed = (int)_anim.Value; _s.AnimBounce = _bounce.IsChecked == true;

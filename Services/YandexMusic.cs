@@ -41,9 +41,23 @@ public static class YandexMusic
 
     public static bool LoggedIn { get { Load(); return _token != null; } }
 
-    /// <summary>Трек играет в Яндекс Музыке (приложение или сайт в Яндекс Браузере).</summary>
-    public static bool IsYandexSource(MediaInfo m) =>
-        m.AppId.Contains("yandex.desktop.music", StringComparison.OrdinalIgnoreCase) || m.AppId.Contains("yandexmusic", StringComparison.OrdinalIgnoreCase);
+    static readonly string[] SiteMarks = { "Яндекс Музык", "Яндекс.Музык", "Yandex Music", "Yandex.Music", "music.yandex" };
+    static string _srcKey = ""; static bool _srcHit; static long _srcAt;
+
+    /// <summary>
+    /// Трек играет в Яндекс Музыке: любое приложение (ru.yandex.desktop.music, версия из Microsoft Store «…Yandex.Music…»)
+    /// или сайт music.yandex в любом браузере — тогда в заголовке окна рядом с названием трека есть «Яндекс Музыка».
+    /// </summary>
+    public static bool IsYandexSource(MediaInfo m)
+    {
+        var id = m.AppId.ToLowerInvariant();
+        if (id.Contains("yandex") && id.Contains("music")) return true;
+        var key = id + "|" + m.Title;
+        // окна перебираем один раз на трек; «нет» перепроверяем через 3 с — браузер мог ещё не обновить заголовок
+        if (key == _srcKey && (_srcHit || Environment.TickCount64 - _srcAt < 3000)) return _srcHit;
+        _srcKey = key; _srcAt = Environment.TickCount64;
+        return _srcHit = MediaService.WindowShows(m.Title, SiteMarks);
+    }
 
     // ---------------------------------------------------------------- токен
     static void Load()

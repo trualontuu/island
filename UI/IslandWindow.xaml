@@ -229,6 +229,34 @@
                 </Grid>
             </Grid>
 
+            <!-- ======== СООБЩЕНИЕ TELEGRAM: карточка как на iPhone ======== -->
+            <Grid x:Name="TgBanner" Margin="14,0,16,0" Height="76" VerticalAlignment="Top" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid Width="46" Height="46" VerticalAlignment="Center">
+                    <Ellipse x:Name="TgBigAvatar" Fill="#5CAFFA"/>
+                    <Ellipse x:Name="TgBigPhoto" Visibility="Collapsed"><Ellipse.Fill><ImageBrush x:Name="TgBigPhotoBrush" Stretch="UniformToFill"/></Ellipse.Fill></Ellipse>
+                    <TextBlock x:Name="TgBigInitial" FontSize="19" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Width="18" Height="18" CornerRadius="9" Background="#2AABEE" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-3,-2"
+                            BorderBrush="{DynamicResource IslandBg}" BorderThickness="2">
+                        <TextBlock FontFamily="{StaticResource Icons}" Text="&#xE724;" FontSize="8" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,1,0"/>
+                    </Border>
+                </Grid>
+                <StackPanel Grid.Column="1" Margin="13,0,0,0" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TgBigTitle" FontSize="14" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="TgBigMeta" Grid.Column="1" FontSize="11.5" Foreground="{DynamicResource Dim}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
+                    <TextBlock x:Name="TgBigText" FontSize="13" Foreground="#D9FFFFFF" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36" Margin="0,2,0,0" LineHeight="17"/>
+                </StackPanel>
+            </Grid>
+
             <!-- ======== РАЗВЁРНУТЫЙ ВИД ======== -->
             <Grid x:Name="Expanded" Margin="16,12,16,14" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0" Cursor="Arrow">
                 <Grid.RowDefinitions>

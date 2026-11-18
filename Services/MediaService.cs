@@ -120,6 +120,29 @@ public sealed class MediaService
 
     /// <summary>Ищет окно браузера, где активна вкладка с этим названием, и определяет сайт по хвосту заголовка
     /// («Название - YouTube - Google Chrome»).</summary>
+    /// <summary>Есть ли видимое окно, где в заголовке после названия трека стоит одна из пометок (имя сайта).</summary>
+    internal static bool WindowShows(string? title, string[] marks)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return false;
+        string probe = title.Trim();
+        if (probe.Length > 30) probe = probe[..30];
+        bool found = false;
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h)) return true;
+            int n = GetWindowTextLength(h);
+            if (n < probe.Length || n > 2000) return true;
+            var sb = new System.Text.StringBuilder(n + 1);
+            GetWindowText(h, sb, sb.Capacity);
+            var t = sb.ToString();
+            int i = t.IndexOf(probe, StringComparison.OrdinalIgnoreCase);
+            if (i < 0) return true;
+            foreach (var mk in marks) if (t.Contains(mk, StringComparison.OrdinalIgnoreCase)) { found = true; return false; }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+
     internal static Site SiteOf(string? title)
     {
         if (string.IsNullOrWhiteSpace(title)) return Site.Unknown;
@@ -345,6 +368,7 @@ public sealed class MediaService
         if (a.Contains("firefox")) return "Firefox";
         if (a.Contains("yandex")) return "Яндекс";
         if (a.Contains("aimp")) return "AIMP";
+        if (NoirLink.IsNoir(aumid)) return "Noir";
         if (a.Contains("zune") || a.Contains("media")) return "Медиаплеер";
         var n = Path.GetFileNameWithoutExtension(aumid.Split('!')[0]);
         return n.Length > 18 ? n[..18] : n;
