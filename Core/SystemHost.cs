@@ -90,6 +90,10 @@ public sealed class SystemHost : IDisposable
                 case "enter": vk = 0x0D; break;
                 case "tab": vk = 0x09; break;
                 case "`": case "tilde": vk = 0xC0; break;
+                case "left": vk = 0x25; break;
+                case "up": vk = 0x26; break;
+                case "right": vk = 0x27; break;
+                case "down": vk = 0x28; break;
                 default:
                     if (raw.Length == 1 && char.IsLetterOrDigit(raw[0])) vk = char.ToUpperInvariant(raw[0]);
                     else if (raw.Length >= 2 && (raw[0] == 'F' || raw[0] == 'f') && int.TryParse(raw[1..], out int f) && f is >= 1 and <= 24) vk = (uint)(0x70 + f - 1);
