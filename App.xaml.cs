@@ -61,7 +61,15 @@ public partial class App : Application
         DispatcherUnhandledException += (_, ex) =>
         {
             ex.Handled = true;
-            try { _island?.Toast("Ошибка: " + ex.Exception.Message, "", Mood.Alert, 4); } catch { }
+            // полный текст — в файл: во всплывашке видно только начало
+            try
+            {
+                var log = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Island", "error.log");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(log)!);
+                System.IO.File.AppendAllText(log, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex.Exception}\n\n");
+            }
+            catch { }
+            try { _island?.Toast("Ошибка: " + ex.Exception.GetBaseException().Message.Split('\n')[0].Trim(), "", Mood.Alert, 4); } catch { }
         };
     }
 
