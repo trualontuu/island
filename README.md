@@ -6,23 +6,56 @@
 
 Чёрная капсула вверху экрана: музыка, уведомления и статус системы, а по клику — пульт управления.
 
+[![Скачать для Windows](https://img.shields.io/badge/Скачать_для_Windows-Island.zip-f2f2f2?style=for-the-badge&logo=windows11&logoColor=111&labelColor=f2f2f2&color=111)](https://github.com/trualontuu/island-releases/releases/latest/download/Island.zip)
+
 ![C#](https://img.shields.io/badge/C%23-111?style=flat-square&logo=dotnet&logoColor=white)
 ![.NET 10](https://img.shields.io/badge/.NET-10-111?style=flat-square&logo=dotnet&logoColor=white)
 ![WPF](https://img.shields.io/badge/WPF-111?style=flat-square&logo=windows11&logoColor=white)
 ![Windows 11](https://img.shields.io/badge/Windows-11-111?style=flat-square&logo=windows11&logoColor=white)
-[![Скачать](https://img.shields.io/github/v/release/trualontuu/island-releases?style=flat-square&label=скачать&color=f2f2f2&labelColor=111)](https://github.com/trualontuu/island-releases/releases/latest)
+[![Версия](https://img.shields.io/github/v/release/trualontuu/island-releases?style=flat-square&label=версия&color=f2f2f2&labelColor=111)](https://github.com/trualontuu/island-releases/releases/latest)
 
 <img src=".github/assets/island.png" alt="Island: раскрытая капсула" width="900">
 
 <img src=".github/assets/island-pills.png" alt="Компактный вид и уведомления" width="440"> <img src=".github/assets/island-mixer.png" alt="Микшер громкости" width="440">
 
+<sub>Макеты: треки, уведомления и приложения выдуманные.</sub>
+
 </div>
 
 ## Установка
 
-Скачай [Island.zip](https://github.com/trualontuu/island-releases/releases/latest/download/Island.zip), распакуй в любую папку и запусти `Island.exe`. Дальше остров обновляется сам.
+> Нужна Windows 11 (64-бит). Ставить .NET не нужно — всё уже внутри.
 
-Если Windows покажет «Windows защитила ваш компьютер» — «Подробнее» → «Выполнить в любом случае» (программа не подписана платным сертификатом).
+1. Скачай **[Island.zip](https://github.com/trualontuu/island-releases/releases/latest/download/Island.zip)** и распакуй в любую папку, например `Документы\Island`.
+2. Запусти `Island.exe` — вверху экрана появится капсула.
+3. Кликни по капсуле, чтобы раскрыть. Правый клик по ней (или по значку в трее) — меню с «Настройками…».
+4. Дальше остров обновляется сам: новые версии скачиваются и ставятся без тебя.
+
+<details>
+<summary><b>Windows пишет «Windows защитила ваш компьютер»</b></summary>
+
+Программа не подписана платным сертификатом. Нажми **«Подробнее» → «Выполнить в любом случае»**. Окно появляется только при первом запуске.
+</details>
+
+<details>
+<summary><b>Как подключить нейросеть, Яндекс Музыку, Telegram</b></summary>
+
+Всё в настройках острова, в своих разделах. Для чата хватит бесплатного ключа [OpenRouter](https://openrouter.ai/keys). Яндекс — вход по коду с ya.ru/device, пароль остров не видит; этот же вход использует [Noir](https://github.com/trualontuu/player).
+</details>
+
+<details>
+<summary><b>Остров мешает в браузере или в игре</b></summary>
+
+В полноэкранных играх он прячется сам. Для браузера включи в настройках «Не мешать вкладкам браузера» — над окном браузера капсула пропускает клики насквозь, а раскрывается по Ctrl / Alt или если задержать на ней курсор.
+</details>
+
+<details>
+<summary><b>Как удалить</b></summary>
+
+Выключи в настройках «Запускать вместе с Windows», закрой остров (правый клик → «Выход») и удали папку. Настройки лежат в `%APPDATA%\Island`.
+</details>
+
+> Хорошо работает в паре с [Noir](https://github.com/trualontuu/player) (плеер) и [Launcher](https://github.com/trualontuu/launcher) (поиск по <kbd>Alt</kbd>+<kbd>Q</kbd>).
 
 ## Что умеет
 
