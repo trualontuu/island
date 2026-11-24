@@ -55,7 +55,7 @@
 Выключи в настройках «Запускать вместе с Windows», закрой остров (правый клик → «Выход») и удали папку. Настройки лежат в `%APPDATA%\Island`.
 </details>
 
-> Хорошо работает в паре с [Noir](https://github.com/trualontuu/player) (плеер) и [Launcher](https://github.com/trualontuu/launcher) (поиск по <kbd>Alt</kbd>+<kbd>Q</kbd>).
+> Хорошо работает в паре с [Noir](https://github.com/trualontuu/player) (плеер).
 
 ## Что умеет
 
@@ -102,4 +102,4 @@ dotnet publish -c Release -o dist
 ```
 
 Проверка без экрана: `Island.exe --snap <папка>` — рисует все вкладки в PNG и прогоняет запрос от «Claude Code» через локальный сервер.
-Код используют [Launcher](https://github.com/trualontuu/launcher) и [Noir](https://github.com/trualontuu/player) — держи репозитории в одной папке.
+Код использует [Noir](https://github.com/trualontuu/player) — держи репозитории в одной папке.
